@@ -51,23 +51,25 @@ def load_robot(position, orientation):
                          angularDamping=config.simulation.default_joint_damping)
 
     # Identify gripper finger joints (assuming last 2 revolute joints are fingers)
-    gripper_indices = [
-        i for i in range(p.getNumJoints(robot_id))
-        if p.getJointInfo(robot_id, i)[2] == p.JOINT_REVOLUTE
-    ][-2:]
-
+    # gripper_indices = [
+    #     i for i in range(p.getNumJoints(robot_id))][-2:]
+    # print([
+    #     i for i in range(p.getNumJoints(robot_id))
+    #     if p.getJointInfo(robot_id, i)[2] == p.JOINT_REVOLUTE
+    # ])
+    # print(gripper_indices)
 
 
     # These dynamics settings help with grasp friction
-    for finger_link in gripper_indices:
+    for finger_link in config.robot.gripper_indices:
         p.changeDynamics(robot_id,
                          linkIndex=finger_link,
-                         lateralFriction=1.5,
-                         spinningFriction=0.1,
-                         rollingFriction=0.1,
-                         restitution=0.0,
-                         contactStiffness=30000.0,
-                         contactDamping=1000.0)
+                         lateralFriction=config.robot.first.gripper_lateral_friction,
+                         spinningFriction=config.robot.first.gripper_spinning_friction,
+                         rollingFriction=config.robot.first.gripper_rolling_friction,
+                         restitution=config.robot.first.gripper_restitution,
+                         contactStiffness=config.robot.first.gripper_contact_stiffness,
+                         contactDamping=config.robot.first.gripper_contact_damping)
     
     # Optional: also set friction on the pawn / object you want to grip
     # assuming you load it elsewhere and have its bodyId and link index (or base link = -1)
@@ -78,7 +80,7 @@ def load_robot(position, orientation):
     # You might also set other parameters if needed, like ERP, CFM, etc.
 
     logger.info("Robot loaded and configured with high friction fingers.")
-    return robot_id, arm_joint_indices, gripper_indices
+    return robot_id, arm_joint_indices, config.robot.gripper_indices
 
 
 
@@ -228,8 +230,7 @@ class EnvironmentBuilder:
         if not self.square_to_world_coords:
              self._define_square_mapping() # Ensure mapping is defined first
 
-        # Define initial piece positions (standard chess starting position)
-        # Format: {square_name: piece_type}
+        
         initial_positions = {
             'a1': 'rook_w', 'b1': 'knight_w', 'c1': 'bishop_w', 'd1': 'queen_w', 'e1': 'king_w', 'f1': 'bishop_w', 'g1': 'knight_w', 'h1': 'rook_w',
             'a2': 'pawn_w', 'b2': 'pawn_w', 'c2': 'pawn_w', 'd2': 'pawn_w', 'e2': 'pawn_w', 'f2': 'pawn_w', 'g2': 'pawn_w', 'h2': 'pawn_w',

@@ -29,18 +29,28 @@ class SingleRobotConfig(BaseModel):
     urdf: str = Field(default="franka_panda/panda.urdf", description="URDF file path for the robot")
     start_position: List[float] = Field(default=[0, 0, 0], min_items=3, max_items=3, description="Starting position [x, y, z]")
     start_orientation: List[float] = Field(default=[0, 0, 0, 1], min_items=4, max_items=4, description="Starting orientation [x, y, z, w]")
+    
     end_effector_index: int = Field(default=11, ge=0, description="Link index of the end effector")
     num_arm_joints: int = Field(default=7, ge=1, description="Number of arm joints")
     max_joint_force: float = Field(default=240.0, gt=0.0, description="Maximum force for arm joints")
+    
     gripper_force: float = Field(default=240.0, gt=0.0, description="Force applied by the gripper")
     gripper_open: float = Field(default=0.025, ge=0.0, le=0.08, description="Position when gripper is open")
     gripper_closed: float = Field(default=0.0, ge=0.0, le=0.08, description="Position when gripper is closed")
+    gripper_lateral_friction: float = Field(default=1.5, gt=0.0, description="Lateral friction for gripper fingers")
+    gripper_spinning_friction: float = Field(default=0.1, gt=0.0, description="Spinning friction for gripper fingers")
+    gripper_rolling_friction: float = Field(default=0.1, gt=0.0, description="Rolling friction for gripper fingers")
+    gripper_restitution: float = Field(default=0.0, ge=0.0, description="Restitution (bounciness) for gripper fingers")
+    gripper_contact_stiffness: float = Field(default=30000.0, gt=0.0, description="Contact stiffness for gripper fingers")
+    gripper_contact_damping: float = Field(default=1000.0, gt=0.0, description="Contact damping for gripper fingers")
+    
     home_position: List[float] = Field(default=[0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785], min_items=7, max_items=7, description="Joint angles for the home position")
     home_position_tolerance: float = Field(default=0.01, gt=0.0, description="Tolerance for reaching home position")
     home_move_timeout: float = Field(default=5.0, gt=0.0, description="Timeout for moving to home position (seconds)")
 
 
 class RobotConfig(BaseModel):
+    gripper_indices: List[int] = Field(default=[9, 10], description="List of gripper finger joint indices")
     first: SingleRobotConfig
     second: SingleRobotConfig
 
@@ -96,6 +106,10 @@ class PickPlaceConfig(BaseModel):
     clearance_z: float = Field(default=0.12, gt=0.0, description="Clearance height above surface for safe moves")
     pick_z_offset: float = Field(default=0.015, gt=0.0, description="Z offset above object for grasping")
     place_z_offset: float = Field(default=0.015, gt=0.0, description="Z offset above target for placing")
+      # Define tolerances - consider making these config parameters
+    xy_tolerance: float = Field(default=0.015, gt=0.0, description="1cm tolerance for XY")
+    z_tolerance: float = Field(default=0.02, gt=0.0, description="2cm tolerance for Z")
+
     # Store Euler angles, convert to quaternion after loading
     ee_down_orientation_euler: List[float] = Field(default=[3.141592653589793, 0, 0], min_items=3, max_items=3, description="EE orientation (Euler angles [roll, pitch, yaw])")
     ee_down_orientation: List[float] = Field(default=None, description="EE orientation (Quaternion [x, y, z, w])") # Will be set after loading
@@ -108,7 +122,7 @@ class PickPlaceConfig(BaseModel):
 
 class TaskConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0, description="Maximum number of retries for pick/place")
-
+    
 
 
 

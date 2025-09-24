@@ -7,6 +7,7 @@
     "default_joint_damping": 0.1
   },
   "robot": {
+    "gripper_indices": [9, 10],
     "first":{
     "urdf": "franka_panda/panda.urdf",
     "start_position": [0, 0, 0],
@@ -15,8 +16,14 @@
     "num_arm_joints": 7,
     "max_joint_force": 240.0,
     "gripper_force": 240.0,
-    "gripper_open": 0.025,
+    "gripper_open": 0.02,
     "gripper_closed": 0.0,
+    "gripper_lateral_friction": 1.5,
+    "gripper_spinning_friction": 0.1,
+    "gripper_rolling_friction": 0.1,
+    "gripper_restitution": 0.0,
+    "gripper_contact_stiffness": 30000.0,
+    "gripper_contact_damping": 1000.0,
     "home_position": [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785],
     "home_position_tolerance": 0.01,
     "home_move_timeout": 5.0
@@ -29,7 +36,13 @@
     "num_arm_joints": 7,
     "max_joint_force": 240.0,
     "gripper_force": 240.0,
-    "gripper_open": 0.025,
+    "gripper_open": 0.02,
+    "gripper_lateral_friction": 1.5,
+    "gripper_spinning_friction": 0.1,
+    "gripper_rolling_friction": 0.1,
+    "gripper_restitution": 0.0,
+    "gripper_contact_stiffness": 30000.0,
+    "gripper_contact_damping": 1000.0,
     "gripper_closed": 0.0,
     "home_position": [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785],
     "home_position_tolerance": 0.01,
@@ -67,10 +80,12 @@
     "piece_color" : [1, 1, 1, 1]
   },
   "pick_place": {
-    "clearance_z": 0.12,
-    "pick_z_offset": 0.015,
+    "clearance_z": 0.15,
+    "pick_z_offset": 0.005,
     "place_z_offset": 0.015,
-    "ee_down_orientation": [3.141592653589793, 0, 0]
+    "ee_down_orientation": [3.141592653589793, 0, 0],
+    "xy_tolerance": 0.015,
+    "z_tolerance": 0.005
   },
   "task": {
     "max_retries": 2
