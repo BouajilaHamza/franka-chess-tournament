@@ -54,12 +54,24 @@ class EnvironmentConfig(BaseModel):
     
     
 class ObjectConfig(BaseModel):
-    pawn_urdf: str = Field(default="assets/urdfs/pawn.urdf", description="URDF file path for the pawn")
-    king_urdf: str = Field(default="assets/urdfs/king.urdf", description="URDF file path for the king")
-    queen_urdf: str = Field(default="assets/urdfs/queen.urdf", description="URDF file path for the queen")
-    rook_urdf: str = Field(default="assets/urdfs/rook.urdf", description="URDF file path for the rook")
-    bishop_urdf: str = Field(default="assets/urdfs/bishop.urdf", description="URDF file path for the bishop")
-    knight_urdf: str = Field(default="assets/urdfs/knight.urdf", description="URDF file path for the knight")
+    pawn_white_urdf: str = Field(default="assets/urdfs/pawn.urdf", description="URDF file path for the pawn")
+    pawn_black_urdf: str = Field(default="assets/urdfs/pawn_b.urdf", description="URDF file path for the pawn")
+    
+    rook_white_urdf: str = Field(default="assets/urdfs/rook.urdf", description="URDF file path for the rook")
+    rook_black_urdf: str = Field(default="assets/urdfs/rook_b.urdf", description="URDF file path for the rook")
+    
+    knight_white_urdf: str = Field(default="assets/urdfs/knight.urdf", description="URDF file path for the knight")
+    knight_black_urdf: str = Field(default="assets/urdfs/knight_b.urdf", description="URDF file path for the knight")
+    
+    bishop_white_urdf: str = Field(default="assets/urdfs/bishop.urdf", description="URDF file path for the bishop")
+    bishop_black_urdf: str = Field(default="assets/urdfs/bishop_b.urdf", description="URDF file path for the bishop")
+    
+    queen_white_urdf: str = Field(default="assets/urdfs/queen.urdf", description="URDF file path for the queen")
+    queen_black_urdf: str = Field(default="assets/urdfs/queen_b.urdf", description="URDF file path for the queen")
+    
+    king_white_urdf: str = Field(default="assets/urdfs/king.urdf", description="URDF file path for the king")
+    king_black_urdf: str = Field(default="assets/urdfs/king_b.urdf", description="URDF file path for the king")
+    
     
     pawn_start_pos: List[float] = Field(default=[0.265, -0.2, 0.02], min_items=3, max_items=3, description="Pawn starting position [x, y, z]")
     pawn_target_pos: List[float] = Field(default=[0.7, 0, 0.02], min_items=3, max_items=3, description="Pawn target position [x, y, z]")

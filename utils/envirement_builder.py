@@ -290,21 +290,20 @@ class EnvironmentBuilder:
 
     def _get_piece_urdf_path(self, piece_type):
         """Map piece type string to its URDF file path."""
-        # This assumes you have separate URDFs for each piece type (e.g., pawn_w.urdf, king_b.urdf)
-        # Update the mapping based on your actual URDF filenames.
+
         urdf_map = {
-            'pawn_w': config.object.pawn_urdf, # Or config.object.pawn_white_urdf
-            'rook_w': config.object.rook_urdf, # Add these to your config
-            'knight_w': config.object.knight_urdf,
-            'bishop_w': config.object.bishop_urdf,
-            'queen_w': config.object.queen_urdf,
-            'king_w': config.object.king_urdf,
-            'pawn_b': config.object.pawn_urdf, # Or config.object.pawn_black_urdf
-            'rook_b': config.object.rook_urdf,
-            'knight_b': config.object.knight_urdf,
-            'bishop_b': config.object.bishop_urdf,
-            'queen_b': config.object.queen_urdf,
-            'king_b': config.object.king_urdf,
+            'pawn_w': config.object.pawn_white_urdf, 
+            'rook_w': config.object.rook_white_urdf,
+            'knight_w': config.object.knight_white_urdf,
+            'bishop_w': config.object.bishop_white_urdf,
+            'queen_w': config.object.queen_white_urdf,
+            'king_w': config.object.king_white_urdf,
+            'pawn_b': config.object.pawn_black_urdf,
+            'rook_b': config.object.rook_black_urdf,
+            'knight_b': config.object.knight_black_urdf,
+            'bishop_b': config.object.bishop_black_urdf,
+            'queen_b': config.object.queen_black_urdf,
+            'king_b': config.object.king_black_urdf,
         }
         return urdf_map.get(piece_type)
 
