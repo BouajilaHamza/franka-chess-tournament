@@ -58,8 +58,8 @@ Add these to a `requirements.txt` file.
     *   [ ] **Setup PyBullet Environment:**
         *   [*] Load chess board URDF.
         *   [*] Load two Franka Panda arms URDFs, positioned appropriately (e.g., opposing sides).
-        *   [ ] Load 32 individual piece URDFs (or separate URDFs per type) and place them in the initial chess position.
-        *   [ ] Define 3D coordinates for each square (`square_to_world_coords`).
+        *   [*] Load 32 individual piece URDFs (or separate URDFs per type) and place them in the initial chess position.
+        *   [*] Define 3D coordinates for each square (`square_to_world_coords`).
         *   [ ] Implement basic IK (`p.calculateInverseKinematics`) for both arms to move to specific square coordinates (approach, grasp, place).
         *   [ ] Implement basic `move_piece_simulated(start_square, end_square, robot_id)` function for *one* arm, including approach, grasp, lift, move, place, release, retreat.
     *   [ ] **Integrate Stockfish:**
