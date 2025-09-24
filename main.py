@@ -2,7 +2,7 @@ import pybullet as p
 import numpy as np
 import time
 import logging
-from utils.envirement_builder import setup_simulation, load_plane, load_robot, load_environment, load_pawn
+from utils.envirement_builder import EnvironmentBuilder
 from utils.simulation import wait
 from configs.config import config
 # --- Logging Configuration ---
@@ -341,85 +341,109 @@ def pick_and_place_with_retry(robot_id, arm_joints, gripper_joints, object_id, s
 # --- Main Execution ---
 def main():
     """Main function to run the simulation."""
-    logger.info("Initializing simulation...")
-    client = setup_simulation()
-    if client < 0:
-        logger.error("Failed to connect to PyBullet.")
-        return
-
-    load_plane() # Load the ground plane
-    logger.info("Loading first robot...")
-    robot_id, arm_joints, gripper_joints = load_robot(config.robot.first.start_position, config.robot.first.start_orientation)
-    if not robot_id:
-        logger.error("Failed to load robot.")
-        p.disconnect()
-        return
+    # --- Example Usage (Conceptual) ---
+    builder = EnvironmentBuilder()
+    env_components = (builder
+                      .connect()
+                      .load_ground_plane()
+                      .load_robots()
+                      .load_chess_board()
+                      .load_pieces() # This calls _define_square_mapping internally
+                      .build()
+                      )
     
-    logger.info("Loading second robot...")
-    second_robot_id, second_arm_joints, second_gripper_joints = load_robot(config.robot.second.start_position, config.robot.second.start_orientation)
-    if not robot_id:
-        logger.error("Failed to load robot.")
-        p.disconnect()
-        return
+    board_id = env_components['board_id']
+    robot1_id = env_components['robot1']['id']
+    robot1_arm_joints = env_components['robot1']['arm_joints']
+    robot1_gripper_joints = env_components['robot1']['gripper_joints']
+    robot2_id = env_components['robot2']['id']
+    # ... etc
+    piece_locations = env_components['piece_ids']
+    square_coords = env_components['square_to_world_coords']
+    logger.info(f"Loaded board ID: {board_id}, Robot1 ID: {robot1_id}, Robot2 ID: {robot2_id}")
+    logger.info(f"Piece Locations: {piece_locations}")
+    logger.info(f"Square Coordinates: {square_coords}")
+    logger.info("robot1_arm_joints: " + str(robot1_arm_joints))
+    logger.info("robot1_gripper_joints: " + str(robot1_gripper_joints))
+    # logger.info("Initializing simulation...")
+    # client = setup_simulation()
+    # if client < 0:
+    #     logger.error("Failed to connect to PyBullet.")
+    #     return
+
+    # load_plane() # Load the ground plane
+    # logger.info("Loading first robot...")
+    # robot_id, arm_joints, gripper_joints = load_robot(config.robot.first.start_position, config.robot.first.start_orientation)
+    # if not robot_id:
+    #     logger.error("Failed to load robot.")
+    #     p.disconnect()
+    #     return
+    
+    # logger.info("Loading second robot...")
+    # second_robot_id, second_arm_joints, second_gripper_joints = load_robot(config.robot.second.start_position, config.robot.second.start_orientation)
+    # if not robot_id:
+    #     logger.error("Failed to load robot.")
+    #     p.disconnect()
+    #     return
 
     # --- Key Change 4: Increase Gripper Finger Friction ---
     # Apply increased friction to the gripper fingers (joints 9 and 10 for Panda)
     # Get the child link index for the joints (usually the link the joint connects TO)
-    try:
-        finger1_link_index = p.getJointInfo(robot_id, 9)[16] # childLinkIndex
-        finger2_link_index = p.getJointInfo(robot_id, 10)[16] # childLinkIndex
-        p.changeDynamics(robot_id, finger1_link_index, lateralFriction=2, spinningFriction=0.5, rollingFriction=0.5) # Increased from default
-        p.changeDynamics(robot_id, finger2_link_index, lateralFriction=2, spinningFriction=0.5, rollingFriction=0.5) # Increased from default
-        logger.info("Increased friction on gripper fingers.")
-    except Exception as e:
-        logger.warning(f"Could not set gripper finger friction: {e}. Check joint/link indices.")
-    try:
-        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
-        for _ in range(10): # Example wait
-            p.stepSimulation()
-            time.sleep(config.simulation.step_delay)
-    except Exception as e:
-        logger.warning(f"Could not open gripper at start: {e}")
-    logger.info("Loading environment...")
-    board_id = load_environment()
-    if not board_id:
-        logger.error("Failed to load board.")
-        p.disconnect()
-        return
-    x= config.object.pawn_start_pos[0]
-    y= config.object.pawn_start_pos[1]
-    z= config.object.pawn_start_pos[2]
-    logger.info("Loading pawn...")
-    for _ in range(8):
-        pawn_id,pawn_position = load_pawn([x,y,z])
-        if not pawn_id:
-            logger.error("Failed to load pawn.")
-            p.disconnect()
-            return
-        y += 0.055 # Space pawns along Y axis
-        config.object.white_pawns.append((pawn_id, pawn_position))
+    # try:
+    #     finger1_link_index = p.getJointInfo(robot_id, 9)[16] # childLinkIndex
+    #     finger2_link_index = p.getJointInfo(robot_id, 10)[16] # childLinkIndex
+    #     p.changeDynamics(robot_id, finger1_link_index, lateralFriction=2, spinningFriction=0.5, rollingFriction=0.5) # Increased from default
+    #     p.changeDynamics(robot_id, finger2_link_index, lateralFriction=2, spinningFriction=0.5, rollingFriction=0.5) # Increased from default
+    #     logger.info("Increased friction on gripper fingers.")
+    # except Exception as e:
+    #     logger.warning(f"Could not set gripper finger friction: {e}. Check joint/link indices.")
+    # try:
+    #     set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
+    #     for _ in range(10): # Example wait
+    #         p.stepSimulation()
+    #         time.sleep(config.simulation.step_delay)
+    # except Exception as e:
+    #     logger.warning(f"Could not open gripper at start: {e}")
+    # logger.info("Loading environment...")
+    # board_id = load_environment()
+    # if not board_id:
+    #     logger.error("Failed to load board.")
+    #     p.disconnect()
+    #     return
+    # x= config.object.pawn_start_pos[0]
+    # y= config.object.pawn_start_pos[1]
+    # z= config.object.pawn_start_pos[2]
+    # logger.info("Loading white pieces ...")
+    # for _ in range(8):
+    #     pawn_id,pawn_position = load_pawn([x,y,z])
+    #     if not pawn_id:
+    #         logger.error("Failed to load pawn.")
+    #         p.disconnect()
+    #         return
+    #     y += 0.055 # Space pawns along Y axis
+    #     config.object.white_pawns.append((pawn_id, pawn_position))
 
 
 
-    for pawn_id,pawn_position in config.object.white_pawns:
-        logger.info(f"==========> Pawn ID: {pawn_id}")
-        # Move to home position at the start
-        if not move_to_home_position(robot_id, arm_joints, config.robot.first.home_position):
-            logger.warning("Failed to move to initial home position.")
+    # for pawn_id,pawn_position in config.object.white_pawns:
+    #     logger.info(f"==========> Pawn ID: {pawn_id}")
+    #     # Move to home position at the start
+    #     if not move_to_home_position(robot_id, arm_joints, config.robot.first.home_position):
+    #         logger.warning("Failed to move to initial home position.")
         
-        logger.info("Running pick and place task with retry...")
-        success = pick_and_place_with_retry(robot_id, arm_joints, gripper_joints,
-                                            pawn_id, pawn_position, config.object.pawn_target_pos, config.task.max_retries)
+    #     logger.info("Running pick and place task with retry...")
+    #     success = pick_and_place_with_retry(robot_id, arm_joints, gripper_joints,
+    #                                         pawn_id, pawn_position, config.object.pawn_target_pos, config.task.max_retries)
 
-        if success:
-            logger.info("\nTask completed successfully!")
-        else:
-            logger.error("\nTask failed after all retries.")
+    #     if success:
+    #         logger.info("\nTask completed successfully!")
+    #     else:
+    #         logger.error("\nTask failed after all retries.")
 
-        # Move back to home position at the end
-        move_to_home_position(robot_id, arm_joints, config.robot.first.home_position)
+    #     # Move back to home position at the end
+    #     move_to_home_position(robot_id, arm_joints, config.robot.first.home_position)
 
-        logger.info("Simulation running. Press Ctrl+C to exit.")
+    #     logger.info("Simulation running. Press Ctrl+C to exit.")
     try:
         while True:
             p.stepSimulation()

@@ -14,12 +14,16 @@ def _get_quaternion(euler_list: List[float]) -> List[float]:
     """Helper function to convert Euler angles to quaternion."""
     return p.getQuaternionFromEuler(euler_list)
 
+
+
 class SimulationConfig(BaseModel):
     step_delay: float = Field(default=1.0 / 240.0, description="Simulation step delay in seconds")
     settle_steps: int = Field(default=100, ge=0, description="Steps to wait for objects to settle")
     move_steps: int = Field(default=300, ge=0, description="Steps for IK movement phases")
     gripper_action_steps: int = Field(default=150, ge=0, description="Steps for gripper open/close actions")
     default_joint_damping: float = Field(default=0.1, ge=0.0, description="Default joint damping")
+
+
 
 class SingleRobotConfig(BaseModel):
     urdf: str = Field(default="franka_panda/panda.urdf", description="URDF file path for the robot")
@@ -45,16 +49,35 @@ class EnvironmentConfig(BaseModel):
     board_urdf: str = Field(default="Open_Chess/urdfs/chess_board.urdf", description="URDF file path for the board")
     board_position: List[float] = Field(default=[0.4, 0, 0.02], min_items=3, max_items=3, description="Board position [x, y, z]")
     board_orientation: List[float] = Field(default=[0, 0, 0, 1], min_items=4, max_items=4, description="Board orientation [x, y, z, w]")
-
+    board_square_size: float = Field(default=0.055, gt=0.0, description="Size of each square on the chess board (meters)")
+    
+    
+    
 class ObjectConfig(BaseModel):
-    pawn_urdf: str = Field(default="Open_Chess/urdfs/pawn.urdf", description="URDF file path for the pawn")
+    pawn_urdf: str = Field(default="assets/urdfs/pawn.urdf", description="URDF file path for the pawn")
+    king_urdf: str = Field(default="assets/urdfs/king.urdf", description="URDF file path for the king")
+    queen_urdf: str = Field(default="assets/urdfs/queen.urdf", description="URDF file path for the queen")
+    rook_urdf: str = Field(default="assets/urdfs/rook.urdf", description="URDF file path for the rook")
+    bishop_urdf: str = Field(default="assets/urdfs/bishop.urdf", description="URDF file path for the bishop")
+    knight_urdf: str = Field(default="assets/urdfs/knight.urdf", description="URDF file path for the knight")
+    
     pawn_start_pos: List[float] = Field(default=[0.265, -0.2, 0.02], min_items=3, max_items=3, description="Pawn starting position [x, y, z]")
     pawn_target_pos: List[float] = Field(default=[0.7, 0, 0.02], min_items=3, max_items=3, description="Pawn target position [x, y, z]")
-    # Note: Mutable defaults like lists for pawn lists are tricky in Pydantic.
-    # We'll handle them separately if needed in the main config or code logic.
-    # For now, we'll define them as empty lists here if needed later.
+
     white_pawns: List = Field(default_factory=list)
     black_pawns: List = Field(default_factory=list)
+    
+    piece_height: float = Field(default=0.05, gt=0.0, description="Height of the chess piece for grasping calculations")
+    piece_radius: float = Field(default=0.02, gt=0.0, description="Radius of the chess piece for grasping calculations")
+    piece_lateral_friction: float = Field(default=1.0, gt=0.0, description="Lateral friction for the chess pieces")
+    piece_spinning_friction: float = Field(default=0.001, gt=0.0, description="Spinning friction for the chess pieces")
+    piece_rolling_friction: float = Field(default=0.001, gt=0.0, description="Rolling friction for the chess pieces")
+    piece_restitution: float = Field(default=0.0, ge=0.0, description="Restitution (bounciness) for the chess pieces")
+    piece_contact_damping: float = Field(default=0.1, gt=0.0, description="Contact damping for the chess pieces")
+    piece_contact_stiffness: float = Field(default=1000.0, gt=0.0, description="Contact stiffness for the chess pieces")
+    piece_color: List[float] = Field(default=[1, 1, 1, 1], min_items=4, max_items=4, description="Default RGBA color for the chess pieces")
+
+
 
 class PickPlaceConfig(BaseModel):
     clearance_z: float = Field(default=0.12, gt=0.0, description="Clearance height above surface for safe moves")
@@ -68,8 +91,13 @@ class PickPlaceConfig(BaseModel):
         """Convert Euler angles to quaternion after model initialization."""
         self.ee_down_orientation = p.getQuaternionFromEuler(self.ee_down_orientation_euler)
 
+
+
 class TaskConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0, description="Maximum number of retries for pick/place")
+
+
+
 
 class Config(BaseModel):
     simulation: SimulationConfig
@@ -83,6 +111,9 @@ class Config(BaseModel):
         """Update the end-effector orientation quaternion after loading Euler angles."""
         # This is now handled in PickPlaceConfig.model_post_init
         pass
+
+
+
 
 
 config = Config(
