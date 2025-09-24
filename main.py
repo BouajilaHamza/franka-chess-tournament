@@ -2,7 +2,7 @@ import pybullet as p
 import numpy as np
 import time
 import logging
-from utils.envirement_builder import EnvironmentBuilder
+from simulation.builder import EnvironmentBuilder
 from utils.simulation import wait
 from configs.config import config
 # --- Logging Configuration ---
