@@ -19,15 +19,6 @@ class RobotController:
         self.ee_index = ee_index
         self.name = robot_name
 
-        # Get robot-specific configuration based on the instance (e.g., first or second robot)
-        # This assumes your config.py has structures like config.robot.first and config.robot.second
-        # You might need to pass the specific config object for this robot instance
-        # For now, let's assume a generic approach or pass the relevant config part during initialization
-        # Example: self.config = config.robot.first # or config.robot.second
-
-        # For now, let's use the config directly where needed, assuming it's namespaced correctly
-        # e.g., config.robot.first.max_joint_force, config.robot.first.gripper_force, etc.
-
         logger.info(f"{self.name} controller initialized with ID {self.id}.")
 
     def _set_arm_positions(self, target_positions):
@@ -38,7 +29,7 @@ class RobotController:
                 jointIndex=joint_idx,
                 controlMode=p.POSITION_CONTROL,
                 targetPosition=target_positions[i],
-                force=config.robot.first.max_joint_force, # Use the appropriate config for this robot instance
+                force=config.robot.first.max_joint_force,
                 maxVelocity=1.0
             )
 
@@ -51,14 +42,14 @@ class RobotController:
         adjusted_position = min(0.08, max(0.0, position))
         logger.info(f"{self.name}: Setting gripper to position: {adjusted_position}")
 
-        # Apply POSITION_CONTROL to BOTH gripper joints (typically joints 9 and 10 for Franka Panda)
+
         for joint_idx in self.gripper_joints:
             p.setJointMotorControl2(
                 bodyIndex=self.id,
                 jointIndex=joint_idx,
                 controlMode=p.POSITION_CONTROL,
                 targetPosition=adjusted_position,
-                force=config.robot.first.gripper_force # Use the appropriate config for this robot instance
+                force=config.robot.first.gripper_force
             )
 
     def _get_current_arm_positions(self):
@@ -91,7 +82,7 @@ class RobotController:
             return False
 
         try:
-            # Send command to move to home position
+
             for i, joint_idx in enumerate(self.arm_joints):
                  p.setJointMotorControl2(
                      bodyIndex=self.id,
@@ -138,8 +129,8 @@ class RobotController:
                 endEffectorLinkIndex=self.ee_index,
                 targetPosition=target_pos,
                 targetOrientation=target_orient,
-                maxNumIterations=100, # Consider making this a config parameter
-                residualThreshold=1e-6 # Consider making this a config parameter
+                maxNumIterations=300, # Consider making this a config parameter
+                residualThreshold=1e-7 # Consider making this a config parameter
             )
 
             current_positions = self._get_current_arm_positions()
@@ -308,7 +299,7 @@ class RobotController:
         robot_config_key = "first" # Placeholder logic needed here
         if self.name == "Robot2":
              robot_config_key = "second"
-        initial_config = getattr(config.robot, robot_config_key).home_position
+        _initial_config = getattr(config.robot, robot_config_key).home_position
 
         for attempt in range(1, max_retries + 2): # 1 initial + max_retries retries
             logger.info(f"{self.name}: --- Attempt {attempt}/{max_retries + 1} ---")
@@ -341,7 +332,7 @@ class RobotController:
                 else:
                      logger.error(f"{self.name}: === Pick and Place FAILED after {max_retries + 1} attempts (including initial) ===")
                      # Optional: Final move to home on ultimate failure
-                     # self.move_to_home_position()
+                     self.move_to_home_position()
 
         return False # Should not be reached, but good practice
 

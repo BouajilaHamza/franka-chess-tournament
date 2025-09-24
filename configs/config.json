@@ -80,8 +80,8 @@
     "piece_color" : [1, 1, 1, 1]
   },
   "pick_place": {
-    "clearance_z": 0.15,
-    "pick_z_offset": 0.005,
+    "clearance_z": 0.1,
+    "pick_z_offset": 0.015,
     "place_z_offset": 0.015,
     "ee_down_orientation": [3.141592653589793, 0, 0],
     "xy_tolerance": 0.015,

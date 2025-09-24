@@ -219,7 +219,7 @@ class EnvironmentBuilder:
 
 
                 self.square_to_world_coords[square_name] = world_square_center.tolist() # Convert numpy array back to list if needed for other parts of your code
-
+                
         logger.debug(f"Defined square mapping (considering orientation): {list(self.square_to_world_coords.keys())[:5]}...") # Log first 5 keys
 
 

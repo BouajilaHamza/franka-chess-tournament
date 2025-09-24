@@ -1,12 +1,11 @@
 import pybullet as p
-import numpy as np
 import time
 import logging
 from simulation.builder import EnvironmentBuilder
 from simulation.robot_controller import RobotController
-from utils.simulation import wait
+
 from configs.config import config
-# --- Logging Configuration ---
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 # Uncomment the line below if you find OMPL or other PyBullet logs too noisy
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main function to run the simulation."""
-    # --- Example Usage (Conceptual) ---
+
     builder = EnvironmentBuilder()
     env_components = (builder
                       .connect()
@@ -32,22 +31,25 @@ def main():
     robot1_arm_joints = env_components['robot1']['arm_joints']
     robot1_gripper_joints = env_components['robot1']['gripper_joints']
     robot2_id = env_components['robot2']['id']
-    pawn_id  = list(env_components['piece_ids'].items())[0][0] # Get the first pawn ID for testing
+    pawn_id  = list(env_components['piece_ids'].items())[0][0]
     start_pos = env_components['square_to_world_coords']['e7']
     target_pos = env_components['square_to_world_coords']['e5']
 
     start_pos_r2 = env_components['square_to_world_coords']['e2']
     target_pos_r2 = env_components['square_to_world_coords']['e4']
-    # --- Example Usage (Conceptual) --- Roboto Controller
+
 
     robot1_controller = RobotController(robot1_id, robot1_arm_joints, robot1_gripper_joints, config.robot.first.end_effector_index, "Robot1")
     robot1_controller.move_to_home_position()
     robot1_controller.pick_and_place_with_retry(pawn_id, start_pos, target_pos)
-
+    robot1_controller.move_to_home_position()
 
     robot2_controller = RobotController(robot2_id, env_components['robot2']['arm_joints'], env_components['robot2']['gripper_joints'], config.robot.second.end_effector_index, "Robot2")
     robot2_controller.move_to_home_position()
+    logger.info(f"Start position for Robot2: {start_pos_r2}, Target position for Robot2: {target_pos_r2}")
     robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r2, target_pos_r2)
+    robot2_controller.move_to_home_position()
+    
     try:
         while True:
             p.stepSimulation()
