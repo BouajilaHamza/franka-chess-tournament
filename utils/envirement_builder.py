@@ -81,38 +81,6 @@ def load_robot(position, orientation):
     return robot_id, arm_joint_indices, gripper_indices
 
 
-# def load_environment():
-#     """Load the chess board."""
-#     try:
-#         board_id = p.loadURDF(config.environment.board_urdf, basePosition=config.environment.board_position,
-#                               baseOrientation=config.environment.board_orientation, useFixedBase=True)
-#         logger.info(f"Environment loaded (Board ID: {board_id}).")
-#         return board_id
-#     except p.error as e:
-#         logger.error(f"Error loading board URDF '{config.environment.board_urdf}': {e}")
-#         return None
-
-# do the same for the gripper finger links (use correct link index)
-
-# # optional: set contact stiffness/damping (newer PyBullet builds)
-# def load_pawn(position):
-#     """Load a pawn at a given position."""
-#     try:
-#         pawn_id = p.loadURDF(config.object.pawn_urdf, basePosition=position, useFixedBase=False)
-#         # --- Key Change 2: Increase Pawn Friction ---
-#         # Apply to all links of the pawn (assuming single link URDF, link index 0)
-#         p.changeDynamics(pawn_id, -1, lateralFriction=3, spinningFriction=3, rollingFriction=3) # Increased from 1.0
-#         p.changeDynamics(pawn_id, -1, contactStiffness=1e4, contactDamping=1e3)
-#         # Let the pawn settle briefly
-#         wait(config.simulation.settle_steps // 2)
-#         logger.info(f"Pawn loaded (ID: {pawn_id}) at {position} with increased friction.")
-#         return pawn_id, position
-#     except p.error as e:
-#         logger.error(f"Error loading pawn URDF '{config.object.pawn_urdf}': {e}")
-#         return None
-    
-
-
 
 
 class EnvironmentBuilder:
