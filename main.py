@@ -23,12 +23,12 @@ def set_arm_positions(robot_id, arm_joints, target_positions):
             jointIndex=joint_idx,
             controlMode=p.POSITION_CONTROL,
             targetPosition=target_positions[i],
-            force=config.robot.max_joint_force,
+            force=config.robot.first.max_joint_force,
             maxVelocity=1.0
         )
 
 # --- Key Change 3: Modified Gripper Control ---
-def set_gripper_position(robot_id, gripper_joints, position, force=config.robot.gripper_force):
+def set_gripper_position(robot_id, gripper_joints, position, force=config.robot.first.gripper_force):
     """
     Set gripper position and apply holding force.
     Uses POSITION_CONTROL to move, then VELOCITY_CONTROL with 0 vel and force to hold.
@@ -65,7 +65,7 @@ def get_ee_position(robot_id, ee_index):
     return np.array(ee_state[0])
 
 
-def move_to_home_position(robot_id, arm_joints, home_position=config.robot.home_position, tolerance=config.robot.home_position_tolerance, timeout=config.robot.home_move_timeout):
+def move_to_home_position(robot_id, arm_joints, home_position=config.robot.first.home_position, tolerance=config.robot.first.home_position_tolerance, timeout=config.robot.first.home_move_timeout):
     """
     Move the robot arm to the predefined home position.
     """
@@ -82,7 +82,7 @@ def move_to_home_position(robot_id, arm_joints, home_position=config.robot.home_
                  jointIndex=joint_idx,
                  controlMode=p.POSITION_CONTROL,
                  targetPosition=home_position[i],
-                 force=config.robot.max_joint_force,
+                 force=config.robot.first.max_joint_force,
                  maxVelocity=1.0 # Moderate speed
              )
 
@@ -200,9 +200,9 @@ def pick_and_place_single_attempt(robot_id, arm_joints, gripper_joints, object_i
     # 1. --- PICKING PHASE ---
     # a. Move above the object
     pick_approach_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-    set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+    set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
     wait(config.simulation.settle_steps // 2)
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                pick_approach_pos, config.pick_place.ee_down_orientation,
                                log_msg=f"1a. Moving above object...{pick_approach_pos}"):
         logger.error("1a. Failed to move above object.")
@@ -210,7 +210,7 @@ def pick_and_place_single_attempt(robot_id, arm_joints, gripper_joints, object_i
 
     # b. Move down to grasp position
     grasp_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.pick_z_offset]
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                grasp_pos, config.pick_place.ee_down_orientation,
                                log_msg="1b. Moving down to grasp..."):
         logger.error("1b. Failed to move to grasp position.")
@@ -218,73 +218,73 @@ def pick_and_place_single_attempt(robot_id, arm_joints, gripper_joints, object_i
 
     # c. Close gripper to grasp - Apply force
     logger.info("1c. Closing gripper and applying force...")
-    set_gripper_position(robot_id, gripper_joints, config.robot.gripper_closed, config.robot.gripper_force) # Ensure gripper is open
+    set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_closed, config.robot.first.gripper_force) # Ensure gripper is open
     wait(config.simulation.gripper_action_steps)
     # Ensure force is applied continuously after closing
-    set_gripper_position(robot_id, gripper_joints, config.robot.gripper_closed, config.robot.gripper_force) # Ensure gripper is open
+    set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_closed, config.robot.first.gripper_force) # Ensure gripper is open
 
 
     # d. Verify grasp (basic check)
-    if not verify_grasp(robot_id, config.robot.end_effector_index, object_id, grasp_pos):
+    if not verify_grasp(robot_id, config.robot.first.end_effector_index, object_id, grasp_pos):
         logger.warning("1d. Grasp verification failed.")
-        set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
         wait(config.simulation.gripper_action_steps)
         return False
     logger.info("1d. Grasp verified.")
 
     # e. Lift the object (force should keep it attached)
     lift_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                lift_pos, config.pick_place.ee_down_orientation,
                                log_msg="1e. Lifting object..."):
         logger.error("1e. Failed to lift object.")
-        set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
         wait(config.simulation.gripper_action_steps)
         return False
 
     # 2. --- PLACING PHASE ---
     # a. Move above the target location (correct X, Y from the start)
     place_approach_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                place_approach_pos, config.pick_place.ee_down_orientation,
                                log_msg="2a. Moving above target..."):
         logger.error("2a. Failed to move above target.")
         # Drop object back
         drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-        move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+        move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                             drop_pos, config.pick_place.ee_down_orientation, log_msg="  -> Dropping object back (failed move to target)...")
-        set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
         wait(config.simulation.gripper_action_steps)
         lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
-        move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+        move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                             lift_pos_after_drop, config.pick_place.ee_down_orientation, log_msg="  -> Lifting after drop...")
         return False
 
     # b. Move down to release position (ON the target surface)
     release_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.place_z_offset] # Corrected: Place ON or just above surface
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                release_pos, config.pick_place.ee_down_orientation,
                                log_msg="2b. Moving down to place..."):
         logger.error("2b. Failed to move to place position.")
         # Drop object back
         drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-        move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+        move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                             drop_pos, config.pick_place.ee_down_orientation, log_msg="  -> Dropping object back (failed place)...")
-        set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
         wait(config.simulation.gripper_action_steps)
         lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
-        move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+        move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                             lift_pos_after_drop, config.pick_place.ee_down_orientation, log_msg="  -> Lifting after drop...")
         return False
 
     # c. Open gripper to release
     logger.info("2c. Opening gripper...")
-    set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+    set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
     wait(config.simulation.gripper_action_steps)
 
     # d. Move away (lift up from target)
     retreat_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
-    if not move_to_position_ik(robot_id, arm_joints, config.robot.end_effector_index,
+    if not move_to_position_ik(robot_id, arm_joints, config.robot.first.end_effector_index,
                                retreat_pos, config.pick_place.ee_down_orientation,
                                log_msg="2d. Retreating..."):
         logger.warning("2d. Failed to fully retreat after placing (not critical).")
@@ -301,7 +301,7 @@ def pick_and_place_with_retry(robot_id, arm_joints, gripper_joints, object_id, s
     logger.info(f"Object ID: {object_id}, Start: {start_pos}, Target: {target_pos}")
 
     # Store the home configuration for reset
-    initial_config = config.robot.home_position
+    initial_config = config.robot.first.home_position
 
     for attempt in range(1, max_retries + 2): # 1 initial + max_retries retries
         logger.info(f"--- Attempt {attempt}/{max_retries + 1} ---")
@@ -328,7 +328,7 @@ def pick_and_place_with_retry(robot_id, arm_joints, gripper_joints, object_id, s
             if attempt < max_retries + 1:
                 logger.info("Preparing for retry...")
                 # Open gripper in case it's holding something
-                set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+                set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
                 wait(config.simulation.settle_steps)
                 # The loop will continue, triggering the base return at the start of the next iteration
             else:
@@ -348,8 +348,15 @@ def main():
         return
 
     load_plane() # Load the ground plane
-    logger.info("Loading robot...")
-    robot_id, arm_joints, gripper_joints = load_robot()
+    logger.info("Loading first robot...")
+    robot_id, arm_joints, gripper_joints = load_robot(config.robot.first.start_position, config.robot.first.start_orientation)
+    if not robot_id:
+        logger.error("Failed to load robot.")
+        p.disconnect()
+        return
+    
+    logger.info("Loading second robot...")
+    second_robot_id, second_arm_joints, second_gripper_joints = load_robot(config.robot.second.start_position, config.robot.second.start_orientation)
     if not robot_id:
         logger.error("Failed to load robot.")
         p.disconnect()
@@ -367,7 +374,7 @@ def main():
     except Exception as e:
         logger.warning(f"Could not set gripper finger friction: {e}. Check joint/link indices.")
     try:
-        set_gripper_position(robot_id, gripper_joints, config.robot.gripper_open, config.robot.gripper_force) # Ensure gripper is open
+        set_gripper_position(robot_id, gripper_joints, config.robot.first.gripper_open, config.robot.first.gripper_force) # Ensure gripper is open
         for _ in range(10): # Example wait
             p.stepSimulation()
             time.sleep(config.simulation.step_delay)
@@ -397,7 +404,7 @@ def main():
     for pawn_id,pawn_position in config.object.white_pawns:
         logger.info(f"==========> Pawn ID: {pawn_id}")
         # Move to home position at the start
-        if not move_to_home_position(robot_id, arm_joints, config.robot.home_position):
+        if not move_to_home_position(robot_id, arm_joints, config.robot.first.home_position):
             logger.warning("Failed to move to initial home position.")
         
         logger.info("Running pick and place task with retry...")
@@ -410,7 +417,7 @@ def main():
             logger.error("\nTask failed after all retries.")
 
         # Move back to home position at the end
-        move_to_home_position(robot_id, arm_joints, config.robot.home_position)
+        move_to_home_position(robot_id, arm_joints, config.robot.first.home_position)
 
         logger.info("Simulation running. Press Ctrl+C to exit.")
     try:

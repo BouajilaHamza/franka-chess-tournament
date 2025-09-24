@@ -7,6 +7,7 @@
     "default_joint_damping": 0.1
   },
   "robot": {
+    "first":{
     "urdf": "franka_panda/panda.urdf",
     "start_position": [0, 0, 0],
     "start_orientation": [0, 0, 0, 1],
@@ -20,13 +21,28 @@
     "home_position_tolerance": 0.01,
     "home_move_timeout": 5.0
   },
+    "second":{
+    "urdf": "franka_panda/panda.urdf",
+    "start_position": [0.8, 0, 0],
+    "start_orientation": [0, 0, 90, 1],
+    "end_effector_index": 11,
+    "num_arm_joints": 7,
+    "max_joint_force": 240.0,
+    "gripper_force": 240.0,
+    "gripper_open": 0.025,
+    "gripper_closed": 0.0,
+    "home_position": [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785],
+    "home_position_tolerance": 0.01,
+    "home_move_timeout": 5.0
+  }
+  },
   "environment": {
-    "board_urdf": "Open_Chess/urdfs/chess_board.urdf",
+    "board_urdf": "assets/urdfs/chess_board.urdf",
     "board_position": [0.4, 0, 0.02],
     "board_orientation": [0, 0, 0, 1]
   },
   "object": {
-    "pawn_urdf": "Open_Chess/urdfs/pawn.urdf",
+    "pawn_urdf": "assets/urdfs/pawn.urdf",
     "pawn_start_pos": [0.265, -0.2, 0.02],
     "pawn_target_pos": [0.7, 0, 0.02],
     "white_pawns": [],

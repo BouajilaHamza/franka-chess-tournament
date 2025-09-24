@@ -21,7 +21,7 @@ class SimulationConfig(BaseModel):
     gripper_action_steps: int = Field(default=150, ge=0, description="Steps for gripper open/close actions")
     default_joint_damping: float = Field(default=0.1, ge=0.0, description="Default joint damping")
 
-class RobotConfig(BaseModel):
+class SingleRobotConfig(BaseModel):
     urdf: str = Field(default="franka_panda/panda.urdf", description="URDF file path for the robot")
     start_position: List[float] = Field(default=[0, 0, 0], min_items=3, max_items=3, description="Starting position [x, y, z]")
     start_orientation: List[float] = Field(default=[0, 0, 0, 1], min_items=4, max_items=4, description="Starting orientation [x, y, z, w]")
@@ -34,6 +34,12 @@ class RobotConfig(BaseModel):
     home_position: List[float] = Field(default=[0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785], min_items=7, max_items=7, description="Joint angles for the home position")
     home_position_tolerance: float = Field(default=0.01, gt=0.0, description="Tolerance for reaching home position")
     home_move_timeout: float = Field(default=5.0, gt=0.0, description="Timeout for moving to home position (seconds)")
+
+
+class RobotConfig(BaseModel):
+    first: SingleRobotConfig
+    second: SingleRobotConfig
+
 
 class EnvironmentConfig(BaseModel):
     board_urdf: str = Field(default="Open_Chess/urdfs/chess_board.urdf", description="URDF file path for the board")

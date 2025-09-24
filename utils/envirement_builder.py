@@ -25,12 +25,13 @@ def load_plane():
     logger.debug("Ground plane loaded.")
     return plane_id
 
-def load_robot():
+def load_robot(position, orientation):
     """Load the robot and configure its joints for better grasp stability."""
     robot_id = p.loadURDF(
-        config.robot.urdf,
-        basePosition=config.robot.start_position,
-        baseOrientation=config.robot.start_orientation,
+        
+        config.robot.first.urdf,
+        basePosition=position,
+        baseOrientation=orientation,
         useFixedBase=True
     )
 
@@ -38,7 +39,7 @@ def load_robot():
     arm_joint_indices = [
         i for i in range(p.getNumJoints(robot_id))
         if p.getJointInfo(robot_id, i)[2] == p.JOINT_REVOLUTE
-    ][:config.robot.num_arm_joints]
+    ][:config.robot.first.num_arm_joints]
 
     # Set damping on those arm joints (reduce jitter)
     for joint_idx in arm_joint_indices:
