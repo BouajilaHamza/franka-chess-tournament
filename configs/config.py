@@ -67,6 +67,7 @@ class ObjectConfig(BaseModel):
     white_pawns: List = Field(default_factory=list)
     black_pawns: List = Field(default_factory=list)
     
+    piece_mass: float = Field(default=0.08, gt=0.0, description="Mass of a single chess piece")
     piece_height: float = Field(default=0.05, gt=0.0, description="Height of the chess piece for grasping calculations")
     piece_radius: float = Field(default=0.02, gt=0.0, description="Radius of the chess piece for grasping calculations")
     piece_lateral_friction: float = Field(default=1.0, gt=0.0, description="Lateral friction for the chess pieces")

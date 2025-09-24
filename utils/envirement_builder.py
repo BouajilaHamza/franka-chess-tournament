@@ -314,6 +314,7 @@ class EnvironmentBuilder:
             piece_id = p.loadURDF(urdf_path, basePosition=position, useFixedBase=False)
             # Apply dynamics properties for better simulation (similar to load_pawn)
             p.changeDynamics(piece_id, -1,
+                            mass=config.object.piece_mass,
                             lateralFriction=config.object.piece_lateral_friction,
                             spinningFriction=config.object.piece_spinning_friction,
                             rollingFriction=config.object.piece_rolling_friction,

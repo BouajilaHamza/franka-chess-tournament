@@ -40,23 +40,31 @@
     "board_urdf": "assets/urdfs/chess_board.urdf",
     "board_position": [0.4, 0, 0.02],
     "board_orientation": [0, 0, 90, 90],
-    "board_square_size": 0.055,
-    "piece_height" : 0.05,
-    "piece_radius" : 0.02,
-    "piece_lateral_friction" : 1.5,
-    "piece_spinning_friction" : 0.5,
-    "piece_rolling_friction" : 0.5,
-    "piece_restitution" : 0.0,
-    "piece_contact_damping" : 0.5,
-    "piece_contact_stiffness" : 1000.0,
-    "piece_color" : [1, 1, 1, 1]
+    "board_square_size": 0.055
   },
+
   "object": {
     "pawn_urdf": "assets/urdfs/pawn.urdf",
+    "knght_urdf": "assets/urdfs/knight.urdf",
+    "bishop_urdf": "assets/urdfs/bishop.urdf",
+    "rook_urdf": "assets/urdfs/rook.urdf",
+    "queen_urdf": "assets/urdfs/queen.urdf",
+    "king_urdf": "assets/urdfs/king.urdf",
+
     "pawn_start_pos": [0.265, -0.2, 0.02],
     "pawn_target_pos": [0.7, 0, 0.02],
     "white_pawns": [],
-    "black_pawns": []
+    "black_pawns": [],
+    "piece_mass" : 0.6,
+    "piece_height" : 0.05,
+    "piece_radius" : 0.02,
+    "piece_lateral_friction" : 1,
+    "piece_spinning_friction" : 0.1,
+    "piece_rolling_friction" : 0.1,
+    "piece_restitution" : 0.0,
+    "piece_contact_damping" : 0.001,
+    "piece_contact_stiffness" : 1000.0,
+    "piece_color" : [1, 1, 1, 1]
   },
   "pick_place": {
     "clearance_z": 0.12,
