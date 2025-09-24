@@ -191,31 +191,67 @@ class EnvironmentBuilder:
         return self
 
     def _define_square_mapping(self):
-        """Define the mapping between chess notation and 3D world coordinates."""
+        """Define the mapping between chess notation and 3D world coordinates, considering board orientation."""
         board_pos = np.array(config.environment.board_position)
-        _board_orient_quat = config.environment.board_orientation
-        # For a standard board, we can calculate the square centers based on its position and a fixed square size.
-        # Assume the board URDF is centered at board_pos, and the board is 0.4m x 0.4m (8 squares * 0.05m each)
-        # Adjust the calculation based on your actual board URDF dimensions and orientation if needed.
-        square_size = config.environment.board_square_size # Assuming you add this to your config
-        board_width = 8 * square_size
-        board_start_x = board_pos[0] - board_width / 2.0 + square_size / 2.0 # Center of first square (a-file)
-        board_start_y = board_pos[1] - board_width / 2.0 + square_size / 2.0 # Center of first square (1st rank)
+        board_orient_quat = config.environment.board_orientation # This is the quaternion from loadURDF
+        square_size = config.environment.board_square_size
+        piece_height = config.object.piece_height # Assuming this is defined
 
-        for rank_idx in range(8): # Ranks 1 to 8 (PyBullet Y-axis)
-            for file_idx in range(8): # Files a to h (PyBullet X-axis)
+        # 1. Define square positions in the BOARD'S LOCAL FRAME
+        # Assume the board's local frame origin is at the center of the board.
+        # Calculate the offset from the center to the center of the 'a1' square in the local frame.
+        board_width = 8 * square_size
+        # The local origin is at the center. The center of a1 (index 0,0) is offset by (-board_width/2 + square_size/2, -board_width/2 + square_size/2)
+        local_a1_center_offset = np.array([-board_width / 2.0 + square_size / 2.0, -board_width / 2.0 + square_size / 2.0, 0.0])
+
+        for rank_idx in range(8): # Ranks 1 to 8 (Local Y-axis increases)
+            for file_idx in range(8): # Files a to h (Local X-axis increases)
                 file_char = chr(ord('a') + file_idx)
                 rank_char = str(rank_idx + 1)
                 square_name = f"{file_char}{rank_char}"
 
-                x = board_start_x + file_idx * square_size
-                y = board_start_y + rank_idx * square_size
-                z = board_pos[2] + config.object.piece_height / 2.0 # Approximate Z height for piece base
+                # Calculate square center in the LOCAL frame of the board
+                local_square_center = local_a1_center_offset + np.array([file_idx * square_size, rank_idx * square_size, 0.0])
 
-                self.square_to_world_coords[square_name] = [x, y, z]
+                # 2. TRANSFORM the local coordinates to WORLD coordinates using the board's pose
+                # p.multiplyTransforms is used here.
+                # We treat the local square center as a point attached to the board link.
+                # The board link is at board_pos with orientation board_orient_quat.
+                # To transform a point from the local frame of an object to the world frame:
+                # world_point = board_pos + R_board * local_point
+                # PyBullet's p.multiplyTransforms can do this.
+                # However, for a simple point transformation, we can use:
+                # 1. Convert quaternion to rotation matrix
+                # 2. Apply rotation: rotated_point = R_matrix @ local_point
+                # 3. Apply translation: world_point = board_pos + rotated_point
 
-        logger.debug(f"Defined square mapping: {list(self.square_to_world_coords.keys())[:5]}...") # Log first 5 keys
-        return self
+                # Convert quaternion to rotation matrix
+                R_matrix = np.array(p.getMatrixFromQuaternion(board_orient_quat)).reshape(3, 3)
+
+                # Apply rotation
+                rotated_local_center = R_matrix @ local_square_center
+
+                # Apply translation
+                world_square_center = board_pos + rotated_local_center
+
+                # The Z-coordinate in world frame needs the board's Z-height plus half the piece height
+                # The local Z is 0, so the world Z is primarily determined by board_pos[2]
+                # If the board's local Z-axis isn't aligned with world Z due to orientation,
+                # this simple addition might be slightly off. For a flat board rotated around Z/X/Y,
+                # board_pos[2] is often the base height. The piece sits on top.
+                # Let's assume board_pos[2] is the Z of the *top surface* of the board for piece placement.
+                # If board_pos[2] is the center, add half its thickness.
+                # For now, let's use board_pos[2] + piece_height/2, assuming board_pos[2] is the top surface Z when orientation is [0,0,0,1].
+                # This might need fine-tuning based on your board URDF's local Z offset if the origin isn't at the top.
+                # A more robust way is if the board URDF's origin is known (e.g., center bottom), calculate accordingly.
+                # For a standard flat board, this is often fine if board_pos Z is set correctly for the top surface.
+                world_square_center[2] = board_pos[2] + piece_height / 2.0
+
+
+                self.square_to_world_coords[square_name] = world_square_center.tolist() # Convert numpy array back to list if needed for other parts of your code
+
+        logger.debug(f"Defined square mapping (considering orientation): {list(self.square_to_world_coords.keys())[:5]}...") # Log first 5 keys
+
 
     def load_pieces(self):
         """Load all 32 chess pieces in their initial positions."""
