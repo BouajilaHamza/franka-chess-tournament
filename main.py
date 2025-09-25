@@ -35,19 +35,34 @@ def main():
     start_pos = env_components['square_to_world_coords']['e7']
     target_pos = env_components['square_to_world_coords']['e5']
 
-    start_pos_r2 = env_components['square_to_world_coords']['e2']
-    target_pos_r2 = env_components['square_to_world_coords']['e4']
+    start_pos_r2 = env_components['square_to_world_coords']['a2']
+    target_pos_r2 = env_components['square_to_world_coords']['a4']
+    start_pos_r3 = env_components['square_to_world_coords']['e2']
+    target_pos_r3 = env_components['square_to_world_coords']['e4']
+    start_pos_r4 = env_components['square_to_world_coords']['h2']
+    target_pos_r4 = env_components['square_to_world_coords']['h4']
 
 
-    robot1_controller = RobotController(robot1_id, robot1_arm_joints, robot1_gripper_joints, config.robot.first.end_effector_index, "Robot1")
-    robot1_controller.move_to_home_position()
-    robot1_controller.pick_and_place_with_retry(pawn_id, start_pos, target_pos)
-    robot1_controller.move_to_home_position()
+    # robot1_controller = RobotController(robot1_id, robot1_arm_joints, robot1_gripper_joints, config.robot.first.end_effector_index, "Robot1")
+    # robot1_controller.move_to_home_position()
+    # robot1_controller.pick_and_place_with_retry(pawn_id, start_pos, target_pos)
+    # robot1_controller.move_to_home_position()
 
-    robot2_controller = RobotController(robot2_id, env_components['robot2']['arm_joints'], env_components['robot2']['gripper_joints'], config.robot.second.end_effector_index, "Robot2")
+    robot2_controller = RobotController(robot2_id, 
+                                        env_components['robot2']['arm_joints'], 
+                                        env_components['robot2']['gripper_joints'], config.robot.second.end_effector_index, "Robot2")
     robot2_controller.move_to_home_position()
+    
     logger.info(f"Start position for Robot2: {start_pos_r2}, Target position for Robot2: {target_pos_r2}")
     robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r2, target_pos_r2)
+    robot2_controller.move_to_home_position()
+
+    logger.info(f"Start position for Robot2: {start_pos_r3}, Target position for Robot2: {target_pos_r3}")
+    robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r3, target_pos_r3)
+    robot2_controller.move_to_home_position()
+    
+    logger.info(f"Start position for Robot2: {start_pos_r4}, Target position for Robot2: {target_pos_r4}")
+    robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r4, target_pos_r4)
     robot2_controller.move_to_home_position()
     
     try:
