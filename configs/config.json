@@ -71,7 +71,7 @@
     "piece_mass" : 0.4,
     "piece_height" : 0.05,
     "piece_radius" : 0.02,
-    "piece_lateral_friction" : 0.1,
+    "piece_lateral_friction" : 1.5,
     "piece_spinning_friction" : 0.1,
     "piece_rolling_friction" : 0.1,
     "piece_restitution" : 0.0,
@@ -80,7 +80,7 @@
     "piece_color" : [1, 1, 1, 1]
   },
   "pick_place": {
-    "clearance_z": 0.1,
+    "clearance_z": 0.05,
     "pick_z_offset": 0.015,
     "place_z_offset": 0.015,
     "ee_down_orientation": [3.141592653589793, 0, 0],

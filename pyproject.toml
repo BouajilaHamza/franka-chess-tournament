@@ -9,5 +9,7 @@ dependencies = [
     "pybullet>=3.2.7",
     "pydantic>=2.11.9",
     "pydantic-settings>=2.10.1",
+    "python-chess>=1.999",
     "scipy>=1.16.2",
+    "stockfish>=3.28.0",
 ]

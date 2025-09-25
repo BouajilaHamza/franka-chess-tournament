@@ -3,7 +3,8 @@ import time
 import logging
 from simulation.builder import EnvironmentBuilder
 from simulation.robot_controller import RobotController
-
+from simulation.chess_engine import ChessEngine
+from simulation import game_logic
 from configs.config import config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,9 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 
-def main():
-    """Main function to run the simulation."""
 
+def main():
+    """Main function to run the chess-playing simulation loop."""
+    logger.info("Starting Chess Robot Simulation...")
+
+    # --- 1. Setup Environment ---
     builder = EnvironmentBuilder()
     env_components = (builder
                       .connect()
@@ -25,48 +29,54 @@ def main():
                       .load_pieces() # This calls _define_square_mapping internally
                       .build()
                       )
-    logger.info(env_components)
+    logger.info("Environment built successfully.")
 
     robot1_id = env_components['robot1']['id']
     robot1_arm_joints = env_components['robot1']['arm_joints']
     robot1_gripper_joints = env_components['robot1']['gripper_joints']
     robot2_id = env_components['robot2']['id']
-    pawn_id  = list(env_components['piece_ids'].items())[0][0]
-    start_pos = env_components['square_to_world_coords']['e7']
-    target_pos = env_components['square_to_world_coords']['e5']
-
-    start_pos_r2 = env_components['square_to_world_coords']['a2']
-    target_pos_r2 = env_components['square_to_world_coords']['a4']
-    start_pos_r3 = env_components['square_to_world_coords']['e2']
-    target_pos_r3 = env_components['square_to_world_coords']['e4']
-    start_pos_r4 = env_components['square_to_world_coords']['h2']
-    target_pos_r4 = env_components['square_to_world_coords']['h4']
+    robot2_arm_joints = env_components['robot2']['arm_joints']
+    robot2_gripper_joints = env_components['robot2']['gripper_joints']
 
 
-    # robot1_controller = RobotController(robot1_id, robot1_arm_joints, robot1_gripper_joints, config.robot.first.end_effector_index, "Robot1")
-    # robot1_controller.move_to_home_position()
-    # robot1_controller.pick_and_place_with_retry(pawn_id, start_pos, target_pos)
-    # robot1_controller.move_to_home_position()
+    robot1_controller = RobotController(
+        robot1_id, robot1_arm_joints, robot1_gripper_joints,
+        config.robot.first.end_effector_index, "Robot1 (White)"
+    )
+    robot2_controller = RobotController(
+        robot2_id, robot2_arm_joints, robot2_gripper_joints,
+        config.robot.second.end_effector_index, "Robot2 (Black)"
+    )
 
-    robot2_controller = RobotController(robot2_id, 
-                                        env_components['robot2']['arm_joints'], 
-                                        env_components['robot2']['gripper_joints'], config.robot.second.end_effector_index, "Robot2")
-    robot2_controller.move_to_home_position()
-    
-    logger.info(f"Start position for Robot2: {start_pos_r2}, Target position for Robot2: {target_pos_r2}")
-    robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r2, target_pos_r2)
+    robot1_controller.move_to_home_position()
     robot2_controller.move_to_home_position()
 
-    logger.info(f"Start position for Robot2: {start_pos_r3}, Target position for Robot2: {target_pos_r3}")
-    robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r3, target_pos_r3)
-    robot2_controller.move_to_home_position()
-    
-    logger.info(f"Start position for Robot2: {start_pos_r4}, Target position for Robot2: {target_pos_r4}")
-    robot2_controller.pick_and_place_with_retry(pawn_id, start_pos_r4, target_pos_r4)
-    robot2_controller.move_to_home_position()
-    
+    # --- 3. Setup Chess Engine ---
     try:
-        while True:
+        engine = ChessEngine(stockfish_path="stockfish") # Adjust path if needed
+        engine.initialize_engine()
+        engine.reset_game() # Ensure the engine starts from the standard position
+    except FileNotFoundError as e:
+        logger.error(f"Stockfish not found: {e}")
+        logger.error("Install stockfish using 'sudo apt install stockfish' or set correct path.")
+        return
+    except Exception as e:
+        logger.error(f"Error initializing ChessEngine: {e}")
+        return
+
+    # --- 4. Start the Game Loop ---
+    # Pass necessary components to the game logic function
+    game_logic.run_game_loop(
+        env_components=env_components,
+        robot_controllers={'black': robot1_controller, 'white': robot2_controller},
+        chess_engine=engine
+    )
+
+
+    logger.info("Game loop ended.")
+    engine.close_engine() # Close the Stockfish process
+    try:
+        while True: # Keep the simulation window open to view the final state
             p.stepSimulation()
             time.sleep(config.simulation.step_delay)
     except KeyboardInterrupt:
