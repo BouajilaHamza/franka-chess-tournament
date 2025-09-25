@@ -84,7 +84,7 @@
     "pick_z_offset": 0.015,
     "place_z_offset": 0.015,
     "ee_down_orientation": [3.141592653589793, 0, 0],
-    "xy_tolerance": 0.015,
+    "xy_tolerance": 0.03,
     "z_tolerance": 0.005
   },
   "task": {
