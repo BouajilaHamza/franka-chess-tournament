@@ -22,8 +22,9 @@ class SimulationConfig(BaseModel):
     move_steps: int = Field(default=300, ge=0, description="Steps for IK movement phases")
     gripper_action_steps: int = Field(default=150, ge=0, description="Steps for gripper open/close actions")
     default_joint_damping: float = Field(default=0.1, ge=0.0, description="Default joint damping")
-
-
+    ompl_timeout: float = Field(default=5.0, ge=0.0, description="OMPL planning timeout in seconds")
+    ik_max_iterations: int = Field(default=1000, ge=0, description="Maximum number of IK iterations")
+    ik_residual_threshold: float = Field(default=1e-7, ge=0.0, description="IK residual threshold")
 
 class SingleRobotConfig(BaseModel):
     urdf: str = Field(default="franka_panda/panda.urdf", description="URDF file path for the robot")
@@ -126,6 +127,11 @@ class TaskConfig(BaseModel):
 
 
 
+
+class PlanningConfig(BaseModel):
+    safety_distance_threshold: float = Field(default=0.05, gt=0.0, description="Safety distance threshold for direct path check")
+    max_retries: int = Field(default=3, ge=0, description="Maximum number of retries for planning")
+
 class Config(BaseModel):
     simulation: SimulationConfig
     robot: RobotConfig
@@ -133,6 +139,7 @@ class Config(BaseModel):
     object: ObjectConfig
     pick_place: PickPlaceConfig
     task: TaskConfig
+    planning: PlanningConfig
 
     def update_ee_orientation(self):
         """Update the end-effector orientation quaternion after loading Euler angles."""
@@ -149,5 +156,6 @@ config = Config(
     environment=EnvironmentConfig(**CONFIG.get("environment", {})),
     object=ObjectConfig(**CONFIG.get("object", {})),
     pick_place=PickPlaceConfig(**CONFIG.get("pick_place", {})),
-    task=TaskConfig(**CONFIG.get("task", {}))
+    task=TaskConfig(**CONFIG.get("task", {})),
+    planning=PlanningConfig(**CONFIG.get("planning", {})),
 )

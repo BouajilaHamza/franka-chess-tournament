@@ -5,8 +5,9 @@ from configs.config import config
 
 
 
-def wait(steps):
+def wait(steps,simulation_steps=None):
     """Wait for a specified number of simulation steps."""
+    sim_steps = simulation_steps if simulation_steps else config.simulation.step_delay
     for _ in range(steps):
         p.stepSimulation()
-        time.sleep(config.simulation.step_delay)
+        time.sleep(sim_steps)

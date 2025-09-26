@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.3.3",
+    "ompl>=1.7.0",
     "pybullet>=3.2.7",
     "pydantic>=2.11.9",
     "pydantic-settings>=2.10.1",

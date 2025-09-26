@@ -1,10 +1,13 @@
 {
   "simulation": {
     "step_delay": 0.004166666666666667,
-    "settle_steps": 100,
+    "settle_steps": 20,
     "move_steps": 300,
     "gripper_action_steps": 150,
-    "default_joint_damping": 0.1
+    "default_joint_damping": 0.1,
+    "ompl_timeout": 5.0,
+    "ik_max_iterations": 1000,
+    "ik_residual_threshold": 1e-7
   },
   "robot": {
     "gripper_indices": [9, 10],
@@ -88,6 +91,10 @@
     "z_tolerance": 0.005
   },
   "task": {
+    "max_retries": 2
+  },
+  "planning": {
+    "planning_timeout": 0.05,
     "max_retries": 2
   }
 }
