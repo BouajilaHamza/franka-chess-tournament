@@ -4,7 +4,7 @@ import pybullet_data
 import pybullet as p
 
 from configs.config import config 
-from utils.simulation import wait
+from utils.helper_functions import wait
 
 
 

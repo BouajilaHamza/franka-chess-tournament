@@ -2,7 +2,7 @@ import pybullet as p
 import time
 import logging
 from configs.config import config
-from utils.simulation import wait
+from utils.helper_functions import wait
 
 from .motion_planners.ik_planner import IKPlanner
 from .motion_planners.ompl_planner import OMPLPlanner

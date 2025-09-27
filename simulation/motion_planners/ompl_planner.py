@@ -5,7 +5,7 @@ from ompl import geometric as og
 from .base_planner import MotionPlanner
 from .ik_planner import IKPlanner
 from configs.config import config
-from utils.simulation import wait
+from utils.helper_functions import wait
 
 
 

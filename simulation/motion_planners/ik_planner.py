@@ -3,7 +3,7 @@ import time
 import logging
 from .base_planner import MotionPlanner
 from configs.config import config
-from utils.simulation import wait
+from utils.helper_functions import wait
 
 
 logger = logging.getLogger(__name__)
