@@ -41,11 +41,11 @@ def main():
 
     robot1_controller = RobotController(
         robot1_id, robot1_arm_joints, robot1_gripper_joints,
-        config.robot.first.end_effector_index, "Robot1 (Black)"
+        config.robot.first.end_effector_index, "Robot1 (Black)",all_obstacle_ids=env_components['piece_ids']
     )
     robot2_controller = RobotController(
         robot2_id, robot2_arm_joints, robot2_gripper_joints,
-        config.robot.second.end_effector_index, "Robot2 (White)"
+        config.robot.second.end_effector_index, "Robot2 (White)",all_obstacle_ids=env_components['piece_ids']
     )
 
     robot1_controller.move_to_home_position()

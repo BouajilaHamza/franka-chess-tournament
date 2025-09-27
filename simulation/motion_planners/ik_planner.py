@@ -1,11 +1,12 @@
 import pybullet as p
 import time
+import logging
 from .base_planner import MotionPlanner
 from configs.config import config
 from utils.simulation import wait
 
 
-
+logger = logging.getLogger(__name__)
 
 
 
@@ -15,7 +16,7 @@ class IKPlanner(MotionPlanner):
     def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="", **kwargs):
         """Move the robot's EE to a target pose using IK with validation."""
         if log_msg:
-            print(f"IK Planner: {log_msg}")
+            logger.info(f"IK Planner: {log_msg}")
         try:
             goal_joint_positions = p.calculateInverseKinematics(
                 bodyUniqueId=robot_id,
@@ -52,15 +53,15 @@ class IKPlanner(MotionPlanner):
             # z_distance = abs(final_ee_pos[2] - target_pos_np[2])
 
             # if xy_distance > config.pick_place.xy_tolerance: # e.g., 0.01
-            #     print(f"IK Planner: EE XY error too large ({xy_distance:.4f}m)") # Use logger
+            #     logger.info(f"IK Planner: EE XY error too large ({xy_distance:.4f}m)") # Use logger
             #     return False
             # if z_distance > config.pick_place.z_tolerance: # e.g., 0.02
-            #     print(f"IK Planner: EE Z error large ({z_distance:.4f}m)") # Use logger
+            #     logger.info(f"IK Planner: EE Z error large ({z_distance:.4f}m)") # Use logger
 
-            print("IK Planner: Movement completed successfully.") # Use logger
+            logger.info("IK Planner: Movement completed successfully.") # Use logger
             return True
         except Exception as e:
-            print(f"IK Planner: IK calculation or movement failed: {e}") # Use logger
+            logger.error(f"IK Planner: IK calculation or movement failed: {e}") # Use logger
             return False
 
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
@@ -68,9 +69,9 @@ class IKPlanner(MotionPlanner):
         tolerance = tolerance or config.robot.first.home_position_tolerance # e.g., 0.01
         timeout = timeout or config.robot.first.home_move_timeout # e.g., 5.0
 
-        print("IK Planner: Moving to home position...") # Use logger
+        logger.info("IK Planner: Moving to home position...") # Use logger
         if not home_position or len(home_position) < len(arm_joints):
-            print("IK Planner: Invalid home position configuration.") # Use logger
+            logger.info("IK Planner: Invalid home position configuration.") # Use logger
             return False
 
         try:
@@ -97,13 +98,13 @@ class IKPlanner(MotionPlanner):
                         break
 
                 if joints_at_target:
-                    print("IK Planner: Successfully reached home position.") # Use logger
+                    logger.info("IK Planner: Successfully reached home position.") # Use logger
                     wait(config.simulation.settle_steps // 2) # Brief pause to settle
                     return True
 
-            print("IK Planner: Timeout waiting for robot to reach home position.") # Use logger
+            logger.info("IK Planner: Timeout waiting for robot to reach home position.") # Use logger
             return False
 
         except Exception as e:
-            print(f"IK Planner: Error moving to home position: {e}") # Use logger
+            logger.error(f"IK Planner: Error moving to home position: {e}") # Use logger
             return False

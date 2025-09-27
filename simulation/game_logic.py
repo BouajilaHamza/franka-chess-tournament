@@ -115,8 +115,7 @@ def run_game_loop(env_components: Dict[str, Any], robot_controllers: Dict[str, R
             game_over = True
             break
         else:
-            # Optional: Move back to home after successful move
-            # controller_to_move.move_to_home_position() # Controlled by pick_and_place_with_retry or separate logic
+            controller_to_move.move_to_home_position() # Controlled by pick_and_place_with_retry or separate logic
             logger.info(f"{robot_name} successfully executed move {start_square_name} -> {target_square_name}")
 
         # 7. Update the chess engine's internal state after the physical move

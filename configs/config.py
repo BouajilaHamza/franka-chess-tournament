@@ -8,7 +8,6 @@ from typing import List
 with open('configs/config.json', 'r') as f:
     CONFIG = json.load(f)
 
-# config.py
 
 def _get_quaternion(euler_list: List[float]) -> List[float]:
     """Helper function to convert Euler angles to quaternion."""
@@ -129,9 +128,15 @@ class TaskConfig(BaseModel):
 
 
 class PlanningConfig(BaseModel):
-    safety_distance_threshold: float = Field(default=0.05, gt=0.0, description="Safety distance threshold for direct path check")
     max_retries: int = Field(default=3, ge=0, description="Maximum number of retries for planning")
-
+    safety_distance_threshold: float = Field(default=0.05, gt=0.0, description="Safety distance threshold for direct path check")
+    ompl_validity_checking_resolution: float = Field(default=0.05, gt=0.0, description="OMPL validity checking resolution")
+    ompl_path_interpolation_steps: int = Field(default=15, ge=0, description="OMPL path interpolation steps")
+    
+    
+    
+    
+    
 class Config(BaseModel):
     simulation: SimulationConfig
     robot: RobotConfig

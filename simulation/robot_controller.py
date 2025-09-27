@@ -112,16 +112,17 @@ class RobotController:
         self._set_gripper_position(config.robot.first.gripper_open)
         wait(config.simulation.settle_steps // 2)
         # Use SMART movement for approach
-        if not self.move_smartly_to_position(pick_approach_pos, config.pick_place.ee_down_orientation,
-                                   log_msg=f"1a. Moving above object...{pick_approach_pos}", held_object_id=None):
+        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
+                                      pick_approach_pos, config.pick_place.ee_down_orientation,
+                                      log_msg="Pick approach"):
             logger.error(f"{self.name}: 1a. Failed to move above object.")
             return False
 
         # b. Move down to grasp position
         grasp_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.pick_z_offset]
         # Use SMART movement for grasp approach
-        if not self.move_smartly_to_position(grasp_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="1b. Moving down to grasp...", held_object_id=None):
+        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
+                                      grasp_pos, config.pick_place.ee_down_orientation,log_msg="Grasp approach"):
             logger.error(f"{self.name}: 1b. Failed to move to grasp position.")
             return False
 
@@ -142,8 +143,8 @@ class RobotController:
         lift_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
         # Use SMART movement for lifting, pass held_object_id
         self.held_object_id = object_id # Update state
-        if not self.move_smartly_to_position(lift_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="1e. Lifting object...", held_object_id=object_id):
+        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos, config.pick_place.ee_down_orientation,
+                                   log_msg="1e. Lifting object..."):
             logger.error(f"{self.name}: 1e. Failed to lift object.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
@@ -174,8 +175,8 @@ class RobotController:
         # b. Move down to release position (ON the target surface)
         release_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.place_z_offset]
         # Use SMART movement for placing, pass held_object_id
-        if not self.move_smartly_to_position(release_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="2b. Moving down to place...", held_object_id=object_id):
+        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,release_pos, config.pick_place.ee_down_orientation,
+                                   log_msg="2b. Moving down to place..."):
             logger.error(f"{self.name}: 2b. Failed to move to place position.")
             # Drop object back
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
@@ -186,8 +187,8 @@ class RobotController:
             wait(config.simulation.gripper_action_steps)
             lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
             # Move away after drop without holding
-            self.move_smartly_to_position(lift_pos_after_drop, config.pick_place.ee_down_orientation,
-                                        log_msg="  -> Lifting after drop...", held_object_id=None)
+            self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos_after_drop, config.pick_place.ee_down_orientation,
+                                        log_msg="  -> Lifting after drop...")
             self.held_object_id = None # Reset state
             return False
 
@@ -200,8 +201,8 @@ class RobotController:
         # d. Move away (lift up from target)
         retreat_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
         # Use SMART movement for retreating, no held object
-        if not self.move_smartly_to_position(retreat_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="2d. Retreating...", held_object_id=None):
+        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,retreat_pos, config.pick_place.ee_down_orientation,
+                                   log_msg="2d. Retreating..."):
             logger.warning(f"{self.name}: 2d. Failed to fully retreat after placing (not critical).")
 
         logger.info(f"{self.name}: --- Pick and Place Single Attempt Complete ---")

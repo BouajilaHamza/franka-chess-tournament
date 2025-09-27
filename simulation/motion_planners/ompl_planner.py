@@ -1,12 +1,17 @@
-# simulation/motion_planners/ompl_planner.py
+import logging
 import pybullet as p
-import time
 from ompl import base as ob
 from ompl import geometric as og
 from .base_planner import MotionPlanner
 from .ik_planner import IKPlanner
 from configs.config import config
 from utils.simulation import wait
+
+
+
+
+logger = logging.getLogger(__name__)
+
 
 class OMPLPlanner(MotionPlanner):
     """Motion planner using OMPL for collision-free path planning."""
@@ -83,14 +88,14 @@ class OMPLPlanner(MotionPlanner):
 
     def _plan_motion(self, robot_id, arm_joints, ee_index, start_config, target_pos, target_orient, held_object_id=None):
         """Plan a collision-free path using OMPL."""
-        print("OMPL Planner: Planning motion...") # Use logger
+        logger.info("OMPL Planner: Planning motion...")
         n_dof = len(arm_joints)
         space = self._create_state_space(robot_id, arm_joints)
         si = ob.SpaceInformation(space)
         validity_checker = self._PandaValidityChecker(si, robot_id, arm_joints, n_dof, self.all_obstacle_ids)
         validity_checker.held_object_id = held_object_id
         si.setStateValidityChecker(validity_checker)
-        si.setStateValidityCheckingResolution(0.005)
+        si.setStateValidityCheckingResolution(config.planning.ompl_validity_checking_resolution)
         motion_validator = ob.DiscreteMotionValidator(si)
         si.setMotionValidator(motion_validator)
         space.setup()
@@ -103,16 +108,16 @@ class OMPLPlanner(MotionPlanner):
                 endEffectorLinkIndex=ee_index,
                 targetPosition=target_pos,
                 targetOrientation=target_orient,
-                maxNumIterations=1000,
-                residualThreshold=1e-6
+                maxNumIterations=config.simulation.ik_max_iterations,
+                residualThreshold=config.simulation.ik_residual_threshold
             )
             goal_config = list(goal_joint_positions[:n_dof])
         except Exception as e:
-            print(f"OMPL Planner: IK failed for goal pose: {e}") # Use logger
+            logger.error(f"OMPL Planner: IK failed for goal pose: {e}")
             return None
 
         if not self._is_joint_config_valid(robot_id, arm_joints, start_config) or not self._is_joint_config_valid(robot_id, arm_joints, goal_config):
-             print("OMPL Planner: Invalid start or goal configuration.") # Use logger
+             logger.info("OMPL Planner: Invalid start or goal configuration.")
              return None
 
         try:
@@ -132,10 +137,10 @@ class OMPLPlanner(MotionPlanner):
             solved = planner.solve(config.simulation.ompl_timeout) # e.g., 2.0
 
             if solved:
-                print("OMPL Planner: Found collision-free path!") # Use logger
+                logger.info("OMPL Planner: Found collision-free path!")
                 path = pdef.getSolutionPath()
                 if path:
-                    path.interpolate(15) # Interpolate for smoother motion
+                    path.interpolate(config.planning.ompl_path_interpolation_steps) # Interpolate for smoother motion
                     waypoints = []
                     for i in range(path.getStateCount()):
                         state = path.getState(i)
@@ -143,56 +148,55 @@ class OMPLPlanner(MotionPlanner):
                         waypoints.append(waypoint)
                     return waypoints
                 else:
-                    print("OMPL Planner: Returned an empty path.") # Use logger
+                    logger.info("OMPL Planner: Returned an empty path.")
             else:
-                print("OMPL Planner: Could not find a path.") # Use logger
+                logger.info("OMPL Planner: Could not find a path.")
             return None
         except Exception as e:
-            print(f"OMPL Planner: Planning error: {e}") # Use logger
+            logger.error(f"OMPL Planner: Planning error: {e}")
             return None
 
     def _execute_path(self, robot_id, arm_joints, waypoints):
         """Execute a planned path by moving through the waypoints."""
         if not waypoints:
-            print("OMPL Planner: No waypoints to execute.") # Use logger
+            logger.info("OMPL Planner: No waypoints to execute.")
             return False
 
-        print(f"OMPL Planner: Executing path with {len(waypoints)} waypoints.") # Use logger
+        logger.info(f"OMPL Planner: Executing path with {len(waypoints)} waypoints.")
         for i, waypoint in enumerate(waypoints):
             if not self._is_joint_config_valid(robot_id, arm_joints, waypoint):
-                print(f"OMPL Planner: Invalid waypoint {i} during execution.") # Use logger
+                logger.info(f"OMPL Planner: Invalid waypoint {i} during execution.")
                 return False
             self._set_joint_positions(robot_id, arm_joints, waypoint, config.robot.first.max_joint_force)
-            for _ in range(2):
-                 p.stepSimulation()
-                 time.sleep(config.simulation.step_delay)
-        print("OMPL Planner: Path execution completed.") # Use logger
+            wait(config.simulation.settle_steps, simulation_steps=config.simulation.step_delay)
+
+        logger.info("OMPL Planner: Path execution completed.")
         return True
 
     def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="", held_object_id=None, **kwargs):
         """Move the robot's EE to a target pose using OMPL for collision-free path planning."""
         if log_msg:
-            print(f"OMPL Planner: {log_msg}") # Use logger
+            logger.info(f"OMPL Planner: {log_msg}")
 
         start_config = self._get_current_joint_states(robot_id, arm_joints)
         if not self._is_joint_config_valid(robot_id, arm_joints, start_config):
-             print("OMPL Planner: Current state is invalid.") # Use logger
+             logger.info("OMPL Planner: Current state is invalid.")
 
         waypoints = self._plan_motion(robot_id, arm_joints, ee_index, start_config, target_pos, target_orient, held_object_id=held_object_id)
 
         if waypoints:
             # self.path_visualizer.visualize_path(robot_id, arm_joints, ee_index, waypoints) # Optional
-            print("OMPL Planner: Using collision-free path.") # Use logger
+            logger.info("OMPL Planner: Using collision-free path.")
             success = self._execute_path(robot_id, arm_joints, waypoints)
             wait(config.simulation.settle_steps)
             # self.path_visualizer.clear_path() # Optional
             return success
         else:
-            print("OMPL Planner: Failed, using direct IK control as fallback.") # Use logger
+            logger.info("OMPL Planner: Failed, using direct IK control as fallback.")
             # Fallback to IK
             ik_planner = IKPlanner() # Or pass an instance
             return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="OMPL Fallback IK")
-        return False
+        # return False
 
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
         """Move the robot arm to the predefined home position."""
