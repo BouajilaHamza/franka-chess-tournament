@@ -143,12 +143,14 @@ class RobotController:
         lift_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
         # Use SMART movement for lifting, pass held_object_id
         self.held_object_id = object_id # Update state
+        logger.debug(f"(Held object ID: {self.held_object_id})")
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos, config.pick_place.ee_down_orientation,
                                    log_msg="1e. Lifting object..."):
             logger.error(f"{self.name}: 1e. Failed to lift object.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
             self.held_object_id = None # Reset state
+            logger.debug(f"(Held object ID: {self.held_object_id})")
             return False
 
         # 2. --- PLACING PHASE ---
@@ -169,7 +171,8 @@ class RobotController:
             # Move away after drop without holding
             self.move_smartly_to_position(lift_pos_after_drop, config.pick_place.ee_down_orientation,
                                         log_msg="  -> Lifting after drop...", held_object_id=None)
-            self.held_object_id = None # Reset state
+            self.held_object_id = None
+            logger.debug(f"(Held object ID: {self.held_object_id})")
             return False
 
         # b. Move down to release position (ON the target surface)
@@ -189,14 +192,16 @@ class RobotController:
             # Move away after drop without holding
             self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos_after_drop, config.pick_place.ee_down_orientation,
                                         log_msg="  -> Lifting after drop...")
-            self.held_object_id = None # Reset state
+            self.held_object_id = None
+            logger.debug(f"(Held object ID: {self.held_object_id})")
             return False
 
         # c. Open gripper to release
         logger.info(f"{self.name}: 2c. Opening gripper...")
         self._set_gripper_position(config.robot.first.gripper_open)
         wait(config.simulation.gripper_action_steps)
-        self.held_object_id = None # Released
+        self.held_object_id = None
+        logger.debug(f"(Held object ID: {self.held_object_id})")
 
         # d. Move away (lift up from target)
         retreat_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]

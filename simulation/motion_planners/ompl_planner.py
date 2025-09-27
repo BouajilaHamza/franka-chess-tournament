@@ -47,21 +47,23 @@ class OMPLPlanner(MotionPlanner):
             # Check joint limits
             for i in range(self.n_dof):
                 if not (self.lower_limits[i] <= joint_positions[i] <= self.upper_limits[i]):
+                    logger.debug(f"OMPL Planner: Joint {i} out of bounds: {joint_positions[i]} : {self.lower_limits[i]} - {self.upper_limits[i]}")
                     return False
-
+            logger.debug(f"OMPL Planner: Valid joint positions: {joint_positions}")
             # Check for collisions
             saved_states = [p.getJointState(self.robot_id, idx)[0] for idx in self.arm_joints]
             try:
                 for i, idx in enumerate(self.arm_joints):
                     p.resetJointState(self.robot_id, idx, joint_positions[i])
-
+                logger.info("OMPL Planner: Check robot body collisions (excluding ground and held object)")
                 # Check robot body collisions (excluding ground and held object)
                 contacts_robot = p.getContactPoints(bodyA=self.robot_id)
                 for contact in contacts_robot:
                     body_b_id = contact[2]
+                    logger.debug(f"OMPL Planner: Contact with body {body_b_id}, != 0 {body_b_id != 0},in all {body_b_id in self.all_obstacle_ids} , obj is not held {body_b_id != self.held_object_id}")
                     if body_b_id != 0 and body_b_id != self.held_object_id and body_b_id in self.all_obstacle_ids:
                         return False
-
+                logger.info("OMPL Planner; checking held object collisions")
                 # Check held object collisions (if any)
                 if self.held_object_id is not None:
                     contacts_held = p.getContactPoints(bodyA=self.held_object_id)
@@ -116,13 +118,29 @@ class OMPLPlanner(MotionPlanner):
             logger.error(f"OMPL Planner: IK failed for goal pose: {e}")
             return None
 
-        if not self._is_joint_config_valid(robot_id, arm_joints, start_config) or not self._is_joint_config_valid(robot_id, arm_joints, goal_config):
-             logger.info("OMPL Planner: Invalid start or goal configuration.")
-             return None
+        # Start config
+        if not self._is_joint_config_valid(robot_id, arm_joints, start_config):
+            start_config, did_clamp = self._clamp_joint_values(robot_id, arm_joints, start_config)
+            if did_clamp:
+                logger.info(f"OMPL Planner: Using clamped start configuration: {start_config}")
+            else:
+                logger.warning(f"OMPL Planner: Unfixable invalid start configuration: {start_config}")
+                return None
+
+        # Goal config
+        if not self._is_joint_config_valid(robot_id, arm_joints, goal_config):
+            goal_config, did_clamp = self._clamp_joint_values(robot_id, arm_joints, goal_config)
+            if did_clamp:
+                logger.info(f"OMPL Planner: Using clamped goal configuration: {goal_config}")
+            else:
+                logger.warning(f"OMPL Planner: Unfixable invalid goal configuration: {goal_config}")
+                return None
+
 
         try:
             pdef = ob.ProblemDefinition(si)
             start_ompl = ob.State(space)
+            
             goal_ompl = ob.State(space)
             for i in range(n_dof):
                  start_ompl[i] = start_config[i]

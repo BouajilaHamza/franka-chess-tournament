@@ -1,5 +1,14 @@
 import abc
 import pybullet as p
+import logging
+
+
+
+
+logger = logging.getLogger(__name__)
+
+
+
 
 class MotionPlanner(abc.ABC):
     """Abstract base class for motion planners."""
@@ -57,10 +66,32 @@ class MotionPlanner(abc.ABC):
     def _is_joint_config_valid(self, robot_id, arm_joints, joint_config):
         """Check if a joint configuration is within limits."""
         if len(joint_config) != len(arm_joints):
+            logger.warning(f"MotionPlanner: Invalid joint configuration length: {len(joint_config)} != {len(arm_joints)}")
             return False
         for i, joint_idx in enumerate(arm_joints):
             info = p.getJointInfo(robot_id, joint_idx)
             lower_limit, upper_limit = info[8], info[9]
             if not (lower_limit <= joint_config[i] <= upper_limit):
+                logger.warning(f"MotionPlanner: Joint {joint_idx} out of bounds: {joint_config[i]} : {lower_limit} - {upper_limit}")
                 return False
         return True
+
+    
+
+    def _clamp_joint_values(self, robot_id, arm_joints, joint_values):
+        """Clamp joint values to within limits. Returns (clamped_values, did_clamp)."""
+        clamped = []
+        did_clamp = False
+        for i, joint_idx in enumerate(arm_joints):
+            info = p.getJointInfo(robot_id, joint_idx)
+            lower_limit, upper_limit = info[8], info[9]
+            value = joint_values[i]
+            new_value = max(lower_limit, min(value, upper_limit))
+            if new_value != value:
+                did_clamp = True
+                logger.warning(
+                    f"MotionPlanner: Clamped joint {joint_idx} "
+                    f"from {value} → {new_value}"
+                )
+            clamped.append(new_value)
+        return clamped, did_clamp
