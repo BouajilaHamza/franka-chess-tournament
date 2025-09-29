@@ -1,6 +1,7 @@
-import pybullet as p
 import time
 import logging
+import numpy as np
+import pybullet as p
 from configs.config import config
 from utils.helper_functions import wait
 
@@ -77,8 +78,8 @@ class RobotController:
         return self.ik_planner.move_to_home(self.id, self.arm_joints, home_position,
                                           tolerance=tolerance, timeout=timeout)
 
-    # --- Other methods (verify_grasp, _pick_place_single_attempt, pick_and_place_with_retry)
-    # --- These remain largely the same but call the new movement functions ---
+
+
     def verify_grasp(self, object_id, expected_pos, timeout=1.0):
         """Basic check if the object is likely grasped."""
         start_time = time.time()
@@ -97,12 +98,39 @@ class RobotController:
         logger.warning(f"{self.name}:   -> Grasp verification timeout.")
         return False
 
-    def _pick_place_single_attempt(self, object_id, start_pos, target_pos):
+    def _pick_place_single_attempt(self, object_id, start_pos, target_pos, metrics_logger=None):
         """
         Perform a single attempt of the pick and place sequence.
         Uses the smart coordinator for movement.
+        Collects and returns metrics.
+        Args:
+            object_id: The ID of the object to pick.
+            start_pos: The starting position [x, y, z].
+            target_pos: The target position [x, y, z].
+            metrics_logger: Optional logger instance for metrics (not used directly here, passed for consistency if needed).
+        Returns:
+            tuple: (success_boolean, metrics_dictionary)
         """
         logger.info(f"{self.name}: --- Starting Pick and Place Single Attempt ---")
+        attempt_start_time = time.time() # --- METRIC: Start time ---
+
+        # --- METRIC: Initialize metrics dictionary ---
+        metrics_data = {
+            "move_number": 1,
+            'success': False, # Default assumption
+            'failure_type': None, # 'IK', 'OMPL', 'Grasp', 'Execution', 'Timeout'
+            'total_time_seconds': None, # Will be calculated at the end
+            'planning_time_seconds': 0.0, # Placeholder, can be refined per planner call if needed
+            'execution_time_seconds': 0.0, # Placeholder, can be refined per execution if needed
+            'placement_error_mm': None, # To be calculated if needed (requires object final pos)
+            'min_collision_proximity_mm': None, # If tracked by planners
+            'algorithm_used': None, # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
+            'retries': 0, # This is handled by pick_and_place_with_retry
+            'piece_type': 'unknown', # Derive from object_id if needed
+            # Add more specific timing/phases if required by planners/coordinator
+        }
+        # --- End METRIC Init ---
+
         start_surface_z = start_pos[2]
         target_surface_z = target_pos[2]
 
@@ -113,18 +141,22 @@ class RobotController:
         wait(config.simulation.settle_steps // 2)
         # Use SMART movement for approach
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                      pick_approach_pos, config.pick_place.ee_down_orientation,
-                                      log_msg="Pick approach"):
+                                    pick_approach_pos, config.pick_place.ee_down_orientation,
+                                    log_msg="Pick approach"):
             logger.error(f"{self.name}: 1a. Failed to move above object.")
-            return False
+            metrics_data['failure_type'] = 'IK' # Or 'Execution'
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
 
         # b. Move down to grasp position
         grasp_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.pick_z_offset]
         # Use SMART movement for grasp approach
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                      grasp_pos, config.pick_place.ee_down_orientation,log_msg="Grasp approach"):
+                                    grasp_pos, config.pick_place.ee_down_orientation,log_msg="Grasp approach"):
             logger.error(f"{self.name}: 1b. Failed to move to grasp position.")
-            return False
+            metrics_data['failure_type'] = 'IK' # Or 'Execution'
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
 
         # c. Close gripper to grasp - Apply force
         logger.info(f"{self.name}: 1c. Closing gripper and applying force...")
@@ -136,7 +168,9 @@ class RobotController:
             logger.warning(f"{self.name}: 1d. Grasp verification failed.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
-            return False
+            metrics_data['failure_type'] = 'Grasp'
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
         logger.info(f"{self.name}: 1d. Grasp verified.")
 
         # e. Lift the object (force should keep it attached)
@@ -145,26 +179,31 @@ class RobotController:
         self.held_object_id = object_id # Update state
         logger.debug(f"(Held object ID: {self.held_object_id})")
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="1e. Lifting object..."):
+                                log_msg="1e. Lifting object..."):
             logger.error(f"{self.name}: 1e. Failed to lift object.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
             self.held_object_id = None # Reset state
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            return False
+            metrics_data['failure_type'] = 'Execution' # Or 'IK' if lifting failed due to IK
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
 
         # 2. --- PLACING PHASE ---
         # a. Move above the target location (correct X, Y from the start)
         place_approach_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
         # Use SMART movement for moving above target, pass held_object_id
+        # --- METRIC: Potentially capture algorithm used ---
+        # This requires the coordinator/planners to return this info, which is complex.
+        # For now, we acknowledge the attempt was made.
         if not self.move_smartly_to_position(place_approach_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="2a. Moving above target...", held_object_id=object_id):
+                                log_msg="2a. Moving above target...", held_object_id=object_id):
             logger.error(f"{self.name}: 2a. Failed to move above target.")
             # Drop object back
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
             self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,
-                                         log_msg="  -> Dropping object back (failed move to target)...",
-                                         held_object_id=object_id)
+                                        log_msg="  -> Dropping object back (failed move to target)...",
+                                        held_object_id=object_id)
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
             lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
@@ -173,30 +212,34 @@ class RobotController:
                                         log_msg="  -> Lifting after drop...", held_object_id=None)
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            return False
+            metrics_data['failure_type'] = 'Execution' # Or 'OMPL' if planning failed
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
 
         # b. Move down to release position (ON the target surface)
         release_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.place_z_offset]
-        # Use SMART movement for placing, pass held_object_id
+
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,release_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="2b. Moving down to place..."):
+                                log_msg="2b. Moving down to place..."):
             logger.error(f"{self.name}: 2b. Failed to move to place position.")
             # Drop object back
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
             self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,
-                                         log_msg="  -> Dropping object back (failed place)...",
-                                         held_object_id=object_id)
+                                        log_msg="  -> Dropping object back (failed place)...",
+                                        held_object_id=object_id)
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
             lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
-            # Move away after drop without holding
+
             self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos_after_drop, config.pick_place.ee_down_orientation,
                                         log_msg="  -> Lifting after drop...")
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            return False
+            metrics_data['failure_type'] = 'Execution' # Or 'IK' if placing failed due to IK
+            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False, metrics_data # --- METRIC: Return on failure ---
 
-        # c. Open gripper to release
+
         logger.info(f"{self.name}: 2c. Opening gripper...")
         self._set_gripper_position(config.robot.first.gripper_open)
         wait(config.simulation.gripper_action_steps)
@@ -205,39 +248,115 @@ class RobotController:
 
         # d. Move away (lift up from target)
         retreat_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
-        # Use SMART movement for retreating, no held object
+
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,retreat_pos, config.pick_place.ee_down_orientation,
-                                   log_msg="2d. Retreating..."):
+                                log_msg="2d. Retreating..."):
             logger.warning(f"{self.name}: 2d. Failed to fully retreat after placing (not critical).")
 
-        logger.info(f"{self.name}: --- Pick and Place Single Attempt Complete ---")
-        return True
+        # --- METRIC: Finalize and Return Success ---
+        metrics_data['success'] = True
+        metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on success ---
+        # --- METRIC: Calculate placement error (Conceptual, requires final object position) ---
+        # This is best done *after* the move and *before* the object is released,
+        # or by tracking the object's final resting position later.
+        # For now, placeholder:
+        try:
+            final_obj_pos, _ = p.getBasePositionAndOrientation(object_id)
+            target_center = np.array(target_pos)
+            error_vector = np.array(final_obj_pos) - target_center
+            # Project onto XY plane (vertical placement error less critical)
+            xy_error_m = np.linalg.norm(error_vector[:2])
+            metrics_data['placement_error_mm'] = xy_error_m * 1000.0 # Convert to mm
+        except Exception as e:
+            logger.warning(f"Could not calculate placement error: {e}")
+            metrics_data['placement_error_mm'] = None # Or -1 to indicate error in calculation
+        # --- End METRIC: Placement Error ---
 
-    def pick_and_place_with_retry(self, object_id, start_pos, target_pos, max_retries=None):
+        logger.info(f"{self.name}: --- Pick and Place Single Attempt Complete ---")
+        return True, metrics_data # --- METRIC: Return on success ---
+
+
+
+
+
+
+    def pick_and_place_with_retry(self, object_id, start_pos, target_pos, max_retries=None): # Add metrics_logger=None if needed directly
         """
         Perform the pick and place sequence with retry logic.
         On retry, the robot returns to the home position before attempting again.
+        Returns metrics data.
+        Args:
+            object_id: The ID of the object to pick.
+            start_pos: The starting position [x, y, z].
+            target_pos: The target position [x, y, z].
+            max_retries: Maximum number of retries.
+            # metrics_logger: Optional logger instance (if needed directly, though coordinator/planners might use it).
+        Returns:
+            tuple: (final_success_boolean, list_of_metrics_dictionaries_for_each_attempt)
+                   The list contains metrics for the successful attempt and any preceding failed attempts.
         """
         max_retries = max_retries or config.task.max_retries
         logger.info(f"{self.name}: === Starting Pick and Place with Retry (Max: {max_retries}) ===")
         logger.info(f"{self.name}: Object ID: {object_id}, Start: {start_pos}, Target: {target_pos}")
 
-        for attempt in range(1, max_retries + 2):
+        # --- METRIC: Initialize list to store metrics for all attempts ---
+        all_attempts_metrics = []
+        # --- End METRIC Init ---
+
+        for attempt in range(1, max_retries + 2): # 1 initial + max_retries retries
             logger.info(f"{self.name}: --- Attempt {attempt}/{max_retries + 1} ---")
+
+            # --- METRIC: Prepare data structure for this specific attempt ---
+            # This data will be populated by _pick_place_single_attempt
+            attempt_metrics_data = {
+                'attempt_number': attempt,
+                'retries': attempt - 1, # 0 for first attempt
+                # Other fields will be filled by _pick_place_single_attempt
+            }
+            # --- End METRIC Init for Attempt ---
 
             if attempt > 1: # This is a retry
                 logger.info(f"{self.name}: Retry #{attempt - 1}: Returning robot to base position before retrying...")
                 if not self.move_to_home_position():
                      logger.error(f"{self.name}: Failed to return to base position for retry. Aborting.")
-                     return False
+                     # --- METRIC: Record failure for this retry attempt ---
+                     # We don't have detailed metrics from move_to_home, so create a minimal entry
+                     home_failure_metric = {
+                         'attempt_number': attempt,
+                         'retries': attempt - 1,
+                         'success': False,
+                         'failure_type': 'Timeout', # Or 'Execution'
+                         'total_time_seconds': None, # Could measure if timed
+                         'algorithm_used': 'IK', # Assuming home move uses IK
+                         'piece_type': 'N/A (Home Move)'
+                         # Add other relevant fields as needed
+                     }
+                     all_attempts_metrics.append(home_failure_metric)
+                     # --- End METRIC: Record failure ---
+                     return False, all_attempts_metrics # Return False and list of metrics so far
                 logger.info(f"{self.name}: Robot returned to base position. Proceeding with retry.")
 
-            # Attempt the pick and place sequence
-            success = self._pick_place_single_attempt(object_id, start_pos, target_pos)
+            # --- METRIC: Record start time for the attempt ---
+            attempt_start_time = time.time()
+            # --- End METRIC: Start time ---
+
+            # --- METRIC: Attempt the pick and place sequence ---
+            # Pass the metrics_logger if _pick_place_single_attempt needs it internally
+            success, metrics_from_attempt = self._pick_place_single_attempt(object_id, start_pos, target_pos) # , metrics_logger=metrics_logger if needed
+            # --- METRIC: Record end time and finalize attempt time ---
+            attempt_end_time = time.time()
+            # Ensure total_time_seconds is set (it should be from _pick_place_single_attempt)
+            if metrics_from_attempt['total_time_seconds'] is None:
+                 metrics_from_attempt['total_time_seconds'] = attempt_end_time - attempt_start_time
+            # --- End METRIC: Finalize time ---
+
+            # --- METRIC: Append the metrics from this attempt to the list ---
+            all_attempts_metrics.append(metrics_from_attempt)
+            # --- End METRIC: Append ---
 
             if success:
                 logger.info(f"{self.name}: === Pick and Place SUCCEEDED on attempt {attempt} ===")
-                return True
+                return True, all_attempts_metrics
             else:
                 logger.warning(f"{self.name}: === Pick and Place FAILED on attempt {attempt} ===")
                 if attempt < max_retries + 1:
@@ -247,4 +366,5 @@ class RobotController:
                 else:
                      logger.error(f"{self.name}: === Pick and Place FAILED after {max_retries + 1} attempts ===")
 
-        return False
+        # Should not be reached, but good practice
+        return False, all_attempts_metrics # Return final failure and all metrics

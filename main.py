@@ -1,25 +1,29 @@
-# main.py
 import pybullet as p
 import time
 import logging
-# --- Import the SQLModel-based metrics logger class ---
-# Adjust the import path according to your actual file structure
-# e.g., if it's in configs/logger_config.py
-from configs.logger_config import MetricsLoggerSQLModel
 
+from simulation import game_logic
+from simulation.chess_engine import ChessEngine
 from simulation.builder import EnvironmentBuilder
 from simulation.robot_controller import RobotController
-from simulation.chess_engine import ChessEngine
-from simulation import game_logic
+
 from configs.config import config
+from configs.logger_config import MetricsLoggerSQLModel
+
+from ui.database_setup import create_db_and_tables
+
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-# Uncomment the line below if you find OMPL or other PyBullet logs too noisy
-# logging.getLogger("pybullet").setLevel(logging.WARNING)
+
 
 def main():
     """Main function to run the chess-playing simulation loop."""
+    logger.info("Starting Metrics Logger and Setting Up Database...")
+    create_db_and_tables()
+
+
     logger.info("Starting Chess Robot Simulation...")
 
     # --- 1. Setup Environment ---
@@ -54,9 +58,9 @@ def main():
     robot1_controller.move_to_home_position()
     robot2_controller.move_to_home_position()
 
-    # --- NEW: Initialize the SQLModel Metrics Logger Instance ---
+
     metrics_logger = MetricsLoggerSQLModel()
-    # --- NEW: Generate Experiment Name/ID ---
+
     import datetime
     experiment_name = f"Chess_Sim_Run_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
     experiment_notes = "Initial run with SQLModel direct logging."
@@ -88,33 +92,28 @@ def main():
         return
 
     # --- 4. Start the Game Loop ---
-    # IMPORTANT: You need to pass the `metrics_logger` instance to `game_logic.run_game_loop`
-    # and potentially modify `run_game_loop` and `RobotController` to use it for logging moves.
     try:
         game_logic.run_game_loop(
             env_components=env_components,
             robot_controllers={'black': robot1_controller, 'white': robot2_controller},
             chess_engine=engine,
-            # --- PASS THE LOGGER INSTANCE ---
-            metrics_logger=metrics_logger # <--- Pass the logger instance
-            # --- You might also pass experiment_id if needed directly, though the logger holds it ---
+            metrics_logger=metrics_logger
             # experiment_id=experiment_id
         )
     except Exception as e:
         logger.error(f"Unexpected error in game loop: {e}")
-        # Ensure experiment end is logged even on unexpected errors in the loop
         metrics_logger.end_experiment()
         raise # Re-raise to propagate the error
 
     logger.info("Game loop ended.")
 
-    # --- NEW: Log Experiment End ---
+
     metrics_logger.end_experiment()
     logger.info("Experiment logging ended.")
 
-    engine.close_engine() # Close the Stockfish process
+    engine.close_engine()
     try:
-        while True: # Keep the simulation window open to view the final state
+        while True:
             p.stepSimulation()
             time.sleep(config.simulation.step_delay)
     except KeyboardInterrupt:

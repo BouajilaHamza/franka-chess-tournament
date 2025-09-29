@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from ui.models import Experiment, Move, FailureDetail, FailureTypeEnum, AlgorithmUsedEnum
 from ui.database_setup import engine
 import logging
-import datetime
+from datetime import datetime
 
 
 

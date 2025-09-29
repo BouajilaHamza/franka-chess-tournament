@@ -46,7 +46,18 @@ class Move(SQLModel, table=True,extend_existing=True):
     min_collision_proximity_mm: Optional[float] = None
     algorithm_used: Optional[AlgorithmUsedEnum] = None # Using Enum
     retries: int = Field(default=0)
-
+#(True, 
+# [
+    # {'success': True, 
+    # 'failure_type': None, 
+    # 'total_time_seconds': 44.38612723350525, 
+    # 'planning_time_seconds': 0.0, 
+    # 'execution_time_seconds': 0.0, 
+    # 'placement_error_mm': np.float64(295.7734073021049), 
+    # 'min_collision_proximity_mm': None, 
+    # 'algorithm_used': None, 
+    # 'retries': 0, 
+    # 'piece_type': 'unknown'}])
     # Relationships
     experiment: Optional[Experiment] = Relationship(back_populates="moves")
     failure_details: List["FailureDetail"] = Relationship(back_populates="move")

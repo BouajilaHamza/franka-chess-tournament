@@ -49,13 +49,13 @@ class OMPLPlanner(MotionPlanner):
                 if not (self.lower_limits[i] <= joint_positions[i] <= self.upper_limits[i]):
                     logger.debug(f"OMPL Planner: Joint {i} out of bounds: {joint_positions[i]} : {self.lower_limits[i]} - {self.upper_limits[i]}")
                     return False
-            logger.debug(f"OMPL Planner: Valid joint positions: {joint_positions}")
+            #logger.debug(f"OMPL Planner: Valid joint positions: {joint_positions}")
             # Check for collisions
             saved_states = [p.getJointState(self.robot_id, idx)[0] for idx in self.arm_joints]
             try:
                 for i, idx in enumerate(self.arm_joints):
                     p.resetJointState(self.robot_id, idx, joint_positions[i])
-                logger.info("OMPL Planner: Check robot body collisions (excluding ground and held object)")
+                #logger.info("OMPL Planner: Check robot body collisions (excluding ground and held object)")
                 # Check robot body collisions (excluding ground and held object)
                 contacts_robot = p.getContactPoints(bodyA=self.robot_id)
                 for contact in contacts_robot:
@@ -63,7 +63,7 @@ class OMPLPlanner(MotionPlanner):
                     logger.debug(f"OMPL Planner: Contact with body {body_b_id}, != 0 {body_b_id != 0},in all {body_b_id in self.all_obstacle_ids} , obj is not held {body_b_id != self.held_object_id}")
                     if body_b_id != 0 and body_b_id != self.held_object_id and body_b_id in self.all_obstacle_ids:
                         return False
-                logger.info("OMPL Planner; checking held object collisions")
+                #logger.info("OMPL Planner; checking held object collisions")
                 # Check held object collisions (if any)
                 if self.held_object_id is not None:
                     contacts_held = p.getContactPoints(bodyA=self.held_object_id)
