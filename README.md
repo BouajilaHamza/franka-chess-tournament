@@ -60,20 +60,20 @@ Add these to a `requirements.txt` file.
         *   [*] Load two Franka Panda arms URDFs, positioned appropriately (e.g., opposing sides).
         *   [*] Load 32 individual piece URDFs (or separate URDFs per type) and place them in the initial chess position.
         *   [*] Define 3D coordinates for each square (`square_to_world_coords`).
-        *   [ ] Implement basic IK (`p.calculateInverseKinematics`) for both arms to move to specific square coordinates (approach, grasp, place).
-        *   [ ] Implement basic `move_piece_simulated(start_square, end_square, robot_id)` function for *one* arm, including approach, grasp, lift, move, place, release, retreat.
-    *   [ ] **Integrate Stockfish:**
-        *   [ ] Use `python-chess` to manage the game state (`chess.Board`).
-        *   [ ] Implement a function `get_robot_move(game_board, engine_color)` that calls Stockfish to get the next move based on the current `game_board` state for the specified color.
+        *   [*] Implement basic IK (`p.calculateInverseKinematics`) for both arms to move to specific square coordinates (approach, grasp, place).
+        *   [*] Implement basic `move_piece_simulated(start_square, end_square, robot_id)` function for *one* arm, including approach, grasp, lift, move, place, release, retreat.
+    *   [*] **Integrate Stockfish:**
+        *   [*] Use `python-chess` to manage the game state (`chess.Board`).
+        *   [*] Implement a function `get_robot_move(game_board, engine_color)` that calls Stockfish to get the next move based on the current `game_board` state for the specified color.
 
 ### Phase 2: Perception (State-Diff)
 
 *   **Status:** Planned
 *   **Goal:** Enable the system to perceive the current board state and detect human moves (if human interaction is added later) or verify robot moves.
 *   **Tasks:**
-    *   [ ] **Implement State-Diff Perception:**
-        *   [ ] Create a function `detect_board_state_from_pybullet()` that iterates through the loaded piece objects, reads their positions using `p.getBasePositionAndOrientation`, and maps them to the corresponding square on the `python-chess.Board` object.
-        *   [ ] Create a function `detect_move_execution(previous_state, current_state)` to identify the move made by a robot based on state changes (optional, verification).
+    *   [*] **Implement State-Diff Perception:**
+        *   [*] Create a function `detect_board_state_from_pybullet()` that iterates through the loaded piece objects, reads their positions using `p.getBasePositionAndOrientation`, and maps them to the corresponding square on the `python-chess.Board` object.
+        *   [*] Create a function `detect_move_execution(previous_state, current_state)` to identify the move made by a robot based on state changes (optional, verification).
 
 ### Phase 3: Streamlit Interface (Communication Hub)
 
@@ -81,10 +81,10 @@ Add these to a `requirements.txt` file.
 *   **Goal:** Create the Streamlit interface for commentary, game state display, and potentially chat.
 *   **Tasks:**
     *   [ ] **Basic UI:**
-        *   [ ] Create Streamlit app (`streamlit_app.py`).
+        *   [*] Create Streamlit app (`streamlit_app.py`).
+        *   [ ] Add metrics to measure robots performence
         *   [ ] Add a display area for the current board state (text representation or simple diagram).
         *   [ ] Add area for game logs/commentary (e.g., `st.text_area`).
-        *   [ ] Add control buttons (Start Game, Reset, Pause/Resume).
     *   [ ] **Integrate Simulation:**
         *   [ ] Ensure the Streamlit app can trigger the main game loop (perception -> decision -> control).
         *   [ ] Send commentary/logs from the simulation loop to the Streamlit interface (likely via session state or file writing/reading if complex).
