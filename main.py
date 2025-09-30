@@ -11,7 +11,7 @@ from configs.config import config
 from configs.logger_config import MetricsLoggerSQLModel
 
 from ui.database_setup import create_db_and_tables
-
+from ui.schemas import MoveData
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,7 +22,9 @@ def main():
     """Main function to run the chess-playing simulation loop."""
     logger.info("Starting Metrics Logger and Setting Up Database...")
     create_db_and_tables()
-
+    # experimend_log_data = ExperimentData()
+    move_log_data = MoveData()
+    # failure_detail_log_data = FailureDetail()
 
     logger.info("Starting Chess Robot Simulation...")
 
@@ -97,8 +99,8 @@ def main():
             env_components=env_components,
             robot_controllers={'black': robot1_controller, 'white': robot2_controller},
             chess_engine=engine,
-            metrics_logger=metrics_logger
-            # experiment_id=experiment_id
+            metrics_logger=metrics_logger,
+            move_log_data=move_log_data,
         )
     except Exception as e:
         logger.error(f"Unexpected error in game loop: {e}")

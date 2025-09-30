@@ -1,6 +1,7 @@
 from sqlmodel import Session, select
-from ui.models import Experiment, Move, FailureDetail, FailureTypeEnum, AlgorithmUsedEnum
+from ui.models import Experiment, Move, FailureDetail
 from ui.database_setup import engine
+from ui.schemas import MoveData
 import logging
 from datetime import datetime
 
@@ -39,7 +40,7 @@ class MetricsLoggerSQLModel:
             self.current_experiment_id = None
             return None
 
-    def log_move(self, move_data_dict):
+    def log_move(self, move_log_data:MoveData):
         """Logs data for a single move/pick-and-place attempt using SQLModel.
         Args:
             move_data_dict (dict): A dictionary containing move data.
@@ -54,28 +55,7 @@ class MetricsLoggerSQLModel:
 
         # --- Map dictionary data to SQLModel instance ---
         try:
-            # Handle enum conversions if necessary (or let SQLModel/Pydantic try)
-            # It's often easier to pass the string value that matches the enum member
-            failure_type_str = move_data_dict.get('failure_type')
-            algorithm_str = move_data_dict.get('algorithm_used')
-
-            move_record = Move(
-                experiment_id=self.current_experiment_id,
-                move_number=self.move_counter,
-                source_square=move_data_dict.get('source_square'),
-                target_square=move_data_dict.get('target_square'),
-                piece_type=move_data_dict.get('piece_type'),
-                success=bool(move_data_dict.get('success', False)),
-                failure_type=FailureTypeEnum(failure_type_str) if failure_type_str else None,
-                total_time_seconds=move_data_dict.get('total_time_seconds'),
-                planning_time_seconds=move_data_dict.get('planning_time_seconds'),
-                execution_time_seconds=move_data_dict.get('execution_time_seconds'),
-                placement_error_mm=move_data_dict.get('placement_error_mm'),
-                min_collision_proximity_mm=move_data_dict.get('min_collision_proximity_mm'),
-                algorithm_used=AlgorithmUsedEnum(algorithm_str) if algorithm_str else None,
-                retries=int(move_data_dict.get('retries', 0))
-                # timestamp is handled by default_factory
-            )
+            move_record = Move(**move_log_data)
 
             with Session(engine) as session:
                 session.add(move_record)
@@ -144,14 +124,3 @@ class MetricsLoggerSQLModel:
         finally:
             self.current_experiment_id = None
             self.move_counter = 0
-
-# --- Usage in main.py would be very similar ---
-# from metrics_logger_sqlmodel import MetricsLoggerSQLModel
-# metrics_logger = MetricsLoggerSQLModel()
-# experiment_id = metrics_logger.start_experiment("Test_Run_SQLModel_v1", "Testing SQLModel logger")
-# ... inside game loop ...
-# move_db_id = metrics_logger.log_move(move_metrics_dict) # Returns DB ID
-# if failure_needs_detail_logging:
-#    metrics_logger.log_failure_detail(move_db_id, error_msg, snapshot_dict)
-# ...
-# metrics_logger.end_experiment()

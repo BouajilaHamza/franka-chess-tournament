@@ -1,3 +1,4 @@
+import time
 import logging
 import pybullet as p
 from ompl import base as ob
@@ -195,26 +196,25 @@ class OMPLPlanner(MotionPlanner):
         """Move the robot's EE to a target pose using OMPL for collision-free path planning."""
         if log_msg:
             logger.info(f"OMPL Planner: {log_msg}")
-
         start_config = self._get_current_joint_states(robot_id, arm_joints)
         if not self._is_joint_config_valid(robot_id, arm_joints, start_config):
              logger.info("OMPL Planner: Current state is invalid.")
-
+        start_planning_time = time.time()
         waypoints = self._plan_motion(robot_id, arm_joints, ee_index, start_config, target_pos, target_orient, held_object_id=held_object_id)
-
+        planning_time = time.time() - start_planning_time
         if waypoints:
             # self.path_visualizer.visualize_path(robot_id, arm_joints, ee_index, waypoints) # Optional
             logger.info("OMPL Planner: Using collision-free path.")
             success = self._execute_path(robot_id, arm_joints, waypoints)
             wait(config.simulation.settle_steps)
-            # self.path_visualizer.clear_path() # Optional
+            #self.path_visualizer.clear_path() # Optional
             return success
         else:
             logger.info("OMPL Planner: Failed, using direct IK control as fallback.")
             # Fallback to IK
             ik_planner = IKPlanner() # Or pass an instance
             return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="OMPL Fallback IK")
-        # return False
+
 
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
         """Move the robot arm to the predefined home position."""

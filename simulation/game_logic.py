@@ -14,6 +14,7 @@ from configs.logger_config import MetricsLoggerSQLModel # Or wherever it's locat
 from simulation.robot_controller import RobotController
 from simulation.chess_engine import ChessEngine
 
+from ui.schemas import MoveData
 logger = logging.getLogger(__name__)
 
 # --- CHANGED: Update function signature to accept metrics_logger ---
@@ -21,7 +22,8 @@ def run_game_loop(
     env_components: Dict[str, Any],
     robot_controllers: Dict[str, RobotController],
     chess_engine: ChessEngine,
-    metrics_logger: MetricsLoggerSQLModel  # Accept the logger instance
+    metrics_logger: MetricsLoggerSQLModel,
+    move_log_data: MoveData,
 ):
     """
     Main game loop integrating perception, decision (engine), and control (robot).
@@ -101,27 +103,34 @@ def run_game_loop(
         # 6. --- Execute the move ---
         logger.info(f"{robot_name} executing move: Pick {piece_id_to_move} from {start_square_name}, place at {target_square_name}")
 
-        # --- NEW: Prepare data structure for logging BEFORE the move ---
-        move_log_data = {
-            'move_number': move_count,
-            'robot_name': robot_name,
-            'robot_color': robot_color,
-            'source_square': start_square_name,
-            'target_square': target_square_name,
-            'piece_id': piece_id_to_move,
-            # --- Data to be filled by the controller or post-processing ---
-            'success': None,
-            'failure_type': None,
-            'total_time_seconds': None,
-            'planning_time_seconds': None,
-            'execution_time_seconds': None,
-            'placement_error_mm': None,
-            'min_collision_proximity_mm': None,
-            'algorithm_used': None,
-            'retries': None,
-            'piece_type': None,
-            # --- End data to be filled ---
-        }
+        move_log_data.move_number=move_count
+        move_log_data.robot_name=robot_name
+        move_log_data.robot_color=robot_color
+        move_log_data.source_square=start_square_name
+        move_log_data.target_square=target_square_name
+        move_log_data.piece_id=piece_id_to_move
+
+        
+        # move_log_data = {
+        #     'move_number': move_count,
+        #     'robot_name': robot_name,
+        #     'robot_color': robot_color,
+        #     'source_square': start_square_name,
+        #     'target_square': target_square_name,
+        #     'piece_id': piece_id_to_move,
+        #     # --- Data to be filled by the controller or post-processing ---
+        #     'success': None,
+        #     'failure_type': None,
+        #     'total_time_seconds': None,
+        #     'planning_time_seconds': None,
+        #     'execution_time_seconds': None,
+        #     'placement_error_mm': None,
+        #     'min_collision_proximity_mm': None,
+        #     'algorithm_used': None,
+        #     'retries': None,
+        #     'piece_type': None,
+        #     # --- End data to be filled ---
+        # }
 
         # --- NEW: Record start time for total move time ---
         move_start_time = time.time()
@@ -141,80 +150,30 @@ def run_game_loop(
         # --- ALTERNATIVE APPROACH: Controller returns (success, [metrics_dict, ...]) ---
         # The controller just performs the move and returns success/metrics.
         # The game loop handles logging.
-        move_result = controller_to_move.pick_and_place_with_retry(
+        success = controller_to_move.pick_and_place_with_retry(
             object_id=piece_id_to_move,
             start_pos=start_pos_world,
             target_pos=target_pos_world,
-            max_retries=getattr(controller_to_move, 'max_retries', 2)
-            # metrics_logger could also be passed here if needed internally
+            max_retries=getattr(controller_to_move, 'max_retries', 2),
+            move_log_data=move_log_data
         )
 
         # --- NEW: Record end time and calculate total move time ---
         move_end_time = time.time()
-        move_log_data['total_time_seconds'] = move_end_time - move_start_time
+        move_log_data.total_time_seconds = move_end_time - move_start_time
 
         # --- CHANGED: Handle the result from the controller ---
         # Assume pick_and_place_with_retry now returns a tuple: (success_bool, list_of_metrics_dicts)
-        success = False # Default assumption
-        metrics_returned_list = [] # Default assumption
-
-        if isinstance(move_result, tuple) and len(move_result) == 2:
-            success_candidate, metrics_candidate = move_result
-            # Validate types within the tuple
-            if isinstance(success_candidate, bool):
-                success = success_candidate
-            else:
-                logger.warning(f"Controller returned unexpected type for success: {type(success_candidate)}. Assuming False.")
-                success = False
-
-            if isinstance(metrics_candidate, list):
-                metrics_returned_list = metrics_candidate
-            elif isinstance(metrics_candidate, dict):
-                 # Fallback if controller *sometimes* returns just a dict
-                 logger.debug("Controller returned a single dict instead of a list.")
-                 metrics_returned_list = [metrics_candidate]
-            else:
-                 logger.warning(f"Controller returned unexpected type for metrics: {type(metrics_candidate)}. Expected list or dict.")
-                 metrics_returned_list = []
-
-        else:
-            # Fallback if controller returns only success or an unexpected format
-            success = bool(move_result) if move_result is not None else False
-            logger.warning(f"Controller return format unexpected for move {move_count}. Assuming success={success}.")
-            metrics_returned_list = []
-
-
-        # --- FIX: Handle the LIST of metrics dictionaries ---
-        # The controller returns a list of metrics for each attempt (including retries)
-        if isinstance(metrics_returned_list, list):
-            if len(metrics_returned_list) > 0:
-                # Option 1: Use metrics from the *last* attempt (presumably the successful one)
-                # Adjust logic here if you want metrics from a different attempt (e.g., the first)
-                final_metrics_dict = metrics_returned_list[-1] # Get the last dict in the list
-                if isinstance(final_metrics_dict, dict):
-                    # Update the main log data dictionary with what the controller returned
-                    # Ensure 'success' flag is correctly set based on the overall `success` variable
-                    # if it wasn't already updated by the controller's returned metrics.
-                    final_metrics_dict['success'] = success # Override with overall success
-                    move_log_data.update(final_metrics_dict)
-                    logger.debug(f"Updated move_log_data with metrics from final attempt.")
-                else:
-                     logger.warning(f"Last item in metrics list for move {move_count} is not a dict.")
-            else:
-                 logger.warning(f"Controller returned an empty metrics list for move {move_count}.")
-        else: # Handle unexpected format (should be caught above, but double-check)
-            logger.error(f"Expected metrics_returned_list to be a list after processing, got {type(metrics_returned_list)}.")
-
-
+        #success = False # Default assumption
         # --- NEW: Log the move data using the metrics logger ---
         # Ensure 'success' is explicitly set in move_log_data based on the `success` variable
         # if it wasn't already updated by the controller's returned metrics.
         # This step is mostly covered by final_metrics_dict['success'] = success above,
         # but as a final safeguard:
-        if 'success' not in move_log_data or move_log_data['success'] is None:
-             move_log_data['success'] = success
+        if move_log_data.success is None:
+             move_log_data.success = success
 
-        logger.info(f"Logging metrics for move {move_count}: Success={move_log_data['success']}")
+        logger.info(f"Logging metrics for move {move_count}: Success={move_log_data.success}")
         # The metrics_logger handles associating this with the current experiment
         logged_move_id = metrics_logger.log_move(move_log_data)
         if logged_move_id:

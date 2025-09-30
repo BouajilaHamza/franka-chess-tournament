@@ -2,13 +2,14 @@ import time
 import logging
 import numpy as np
 import pybullet as p
+from typing import Optional
 from configs.config import config
 from utils.helper_functions import wait
 
 from .motion_planners.ik_planner import IKPlanner
 from .motion_planners.ompl_planner import OMPLPlanner
 from .coordinator import MotionCoordinator
-
+from ui.schemas import MoveData #FailureDetail, ExperimentData
 logger = logging.getLogger(__name__)
 
 class RobotController:
@@ -98,7 +99,7 @@ class RobotController:
         logger.warning(f"{self.name}:   -> Grasp verification timeout.")
         return False
 
-    def _pick_place_single_attempt(self, object_id, start_pos, target_pos, metrics_logger=None):
+    def _pick_place_single_attempt(self, object_id, start_pos, target_pos, move_log_data:MoveData, metrics_logger=None):
         """
         Perform a single attempt of the pick and place sequence.
         Uses the smart coordinator for movement.
@@ -109,26 +110,39 @@ class RobotController:
             target_pos: The target position [x, y, z].
             metrics_logger: Optional logger instance for metrics (not used directly here, passed for consistency if needed).
         Returns:
-            tuple: (success_boolean, metrics_dictionary)
+            bool: success_boolean
         """
         logger.info(f"{self.name}: --- Starting Pick and Place Single Attempt ---")
         attempt_start_time = time.time() # --- METRIC: Start time ---
 
         # --- METRIC: Initialize metrics dictionary ---
-        metrics_data = {
-            "move_number": 1,
-            'success': False, # Default assumption
-            'failure_type': None, # 'IK', 'OMPL', 'Grasp', 'Execution', 'Timeout'
-            'total_time_seconds': None, # Will be calculated at the end
-            'planning_time_seconds': 0.0, # Placeholder, can be refined per planner call if needed
-            'execution_time_seconds': 0.0, # Placeholder, can be refined per execution if needed
-            'placement_error_mm': None, # To be calculated if needed (requires object final pos)
-            'min_collision_proximity_mm': None, # If tracked by planners
-            'algorithm_used': None, # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
-            'retries': 0, # This is handled by pick_and_place_with_retry
-            'piece_type': 'unknown', # Derive from object_id if needed
-            # Add more specific timing/phases if required by planners/coordinator
-        }
+        # metrics_data = {
+        #     "move_number": 1,
+        #     'success': False, # Default assumption
+        #     'failure_type': None, # 'IK', 'OMPL', 'Grasp', 'Execution', 'Timeout'
+        #     'total_time_seconds': None, # Will be calculated at the end
+        #     'planning_time_seconds': 0.0, # Placeholder, can be refined per planner call if needed
+        #     'execution_time_seconds': 0.0, # Placeholder, can be refined per execution if needed
+        #     'placement_error_mm': None, # To be calculated if needed (requires object final pos)
+        #     'min_collision_proximity_mm': None, # If tracked by planners
+        #     'algorithm_used': None, # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
+        #     'retries': 0, # This is handled by pick_and_place_with_retry
+        #     'piece_type': 'unknown', # Derive from object_id if needed
+        #     # Add more specific timing/phases if required by planners/coordinator
+        # }
+
+        move_log_data.move_number=1
+        move_log_data.success=False # Default assumption
+        move_log_data.failure_type=None # 'IK', 'OMPL', 'Grasp', 'Execution', 'Timeout'
+        move_log_data.total_time_seconds=None # Will be calculated at the end
+        move_log_data.planning_time_seconds=0.0 # Placeholder, can be refined per planner call if needed
+        move_log_data.execution_time_seconds=0.0 # Placeholder, can be refined per execution if needed
+        move_log_data.placement_error_mm=None # To be calculated if needed (requires object final pos)
+        move_log_data.min_collision_proximity_mm=None # If tracked by planners
+        move_log_data.algorithm_used="IK" # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
+        move_log_data.piece_type='unknown' # Derive from object_id if needed
+
+
         # --- End METRIC Init ---
 
         start_surface_z = start_pos[2]
@@ -144,9 +158,9 @@ class RobotController:
                                     pick_approach_pos, config.pick_place.ee_down_orientation,
                                     log_msg="Pick approach"):
             logger.error(f"{self.name}: 1a. Failed to move above object.")
-            metrics_data['failure_type'] = 'IK' # Or 'Execution'
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.algorithm_used = 'IK' # Or 'Execution'
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
 
         # b. Move down to grasp position
         grasp_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.pick_z_offset]
@@ -154,9 +168,9 @@ class RobotController:
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
                                     grasp_pos, config.pick_place.ee_down_orientation,log_msg="Grasp approach"):
             logger.error(f"{self.name}: 1b. Failed to move to grasp position.")
-            metrics_data['failure_type'] = 'IK' # Or 'Execution'
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.failure_type = 'IK' # Or 'Execution'
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
 
         # c. Close gripper to grasp - Apply force
         logger.info(f"{self.name}: 1c. Closing gripper and applying force...")
@@ -168,9 +182,9 @@ class RobotController:
             logger.warning(f"{self.name}: 1d. Grasp verification failed.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
-            metrics_data['failure_type'] = 'Grasp'
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.failure_type = 'Grasp'
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
         logger.info(f"{self.name}: 1d. Grasp verified.")
 
         # e. Lift the object (force should keep it attached)
@@ -185,9 +199,9 @@ class RobotController:
             wait(config.simulation.gripper_action_steps)
             self.held_object_id = None # Reset state
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            metrics_data['failure_type'] = 'Execution' # Or 'IK' if lifting failed due to IK
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.failure_type = 'Execution' # Or 'IK' if lifting failed due to IK
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
 
         # 2. --- PLACING PHASE ---
         # a. Move above the target location (correct X, Y from the start)
@@ -199,7 +213,7 @@ class RobotController:
         if not self.move_smartly_to_position(place_approach_pos, config.pick_place.ee_down_orientation,
                                 log_msg="2a. Moving above target...", held_object_id=object_id):
             logger.error(f"{self.name}: 2a. Failed to move above target.")
-            # Drop object back
+
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
             self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,
                                         log_msg="  -> Dropping object back (failed move to target)...",
@@ -212,9 +226,9 @@ class RobotController:
                                         log_msg="  -> Lifting after drop...", held_object_id=None)
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            metrics_data['failure_type'] = 'Execution' # Or 'OMPL' if planning failed
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.failure_type = 'Execution' # Or 'OMPL' if planning failed
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
 
         # b. Move down to release position (ON the target surface)
         release_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.place_z_offset]
@@ -235,9 +249,9 @@ class RobotController:
                                         log_msg="  -> Lifting after drop...")
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
-            metrics_data['failure_type'] = 'Execution' # Or 'IK' if placing failed due to IK
-            metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False, metrics_data # --- METRIC: Return on failure ---
+            move_log_data.failure_type = 'Execution' # Or 'IK' if placing failed due to IK
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
 
 
         logger.info(f"{self.name}: 2c. Opening gripper...")
@@ -254,8 +268,8 @@ class RobotController:
             logger.warning(f"{self.name}: 2d. Failed to fully retreat after placing (not critical).")
 
         # --- METRIC: Finalize and Return Success ---
-        metrics_data['success'] = True
-        metrics_data['total_time_seconds'] = time.time() - attempt_start_time # --- METRIC: End time on success ---
+        move_log_data.success = True
+        move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on success ---
         # --- METRIC: Calculate placement error (Conceptual, requires final object position) ---
         # This is best done *after* the move and *before* the object is released,
         # or by tracking the object's final resting position later.
@@ -266,21 +280,22 @@ class RobotController:
             error_vector = np.array(final_obj_pos) - target_center
             # Project onto XY plane (vertical placement error less critical)
             xy_error_m = np.linalg.norm(error_vector[:2])
-            metrics_data['placement_error_mm'] = xy_error_m * 1000.0 # Convert to mm
+            move_log_data.placement_error_mm = xy_error_m * 1000.0 # Convert to mm
         except Exception as e:
             logger.warning(f"Could not calculate placement error: {e}")
-            metrics_data['placement_error_mm'] = None # Or -1 to indicate error in calculation
+            move_log_data.placement_error_mm = None # Or -1 to indicate error in calculation
         # --- End METRIC: Placement Error ---
 
         logger.info(f"{self.name}: --- Pick and Place Single Attempt Complete ---")
-        return True, metrics_data # --- METRIC: Return on success ---
+        return True # --- METRIC: Return on success ---
 
 
 
 
 
 
-    def pick_and_place_with_retry(self, object_id, start_pos, target_pos, max_retries=None): # Add metrics_logger=None if needed directly
+    def pick_and_place_with_retry(self, object_id, start_pos, target_pos, max_retries=None,
+                                  move_log_data:Optional[MoveData]=None): # Add metrics_logger=None if needed directly
         """
         Perform the pick and place sequence with retry logic.
         On retry, the robot returns to the home position before attempting again.
@@ -292,8 +307,7 @@ class RobotController:
             max_retries: Maximum number of retries.
             # metrics_logger: Optional logger instance (if needed directly, though coordinator/planners might use it).
         Returns:
-            tuple: (final_success_boolean, list_of_metrics_dictionaries_for_each_attempt)
-                   The list contains metrics for the successful attempt and any preceding failed attempts.
+            bool: final_success_boolean
         """
         max_retries = max_retries or config.task.max_retries
         logger.info(f"{self.name}: === Starting Pick and Place with Retry (Max: {max_retries}) ===")
@@ -308,11 +322,11 @@ class RobotController:
 
             # --- METRIC: Prepare data structure for this specific attempt ---
             # This data will be populated by _pick_place_single_attempt
-            attempt_metrics_data = {
-                'attempt_number': attempt,
-                'retries': attempt - 1, # 0 for first attempt
-                # Other fields will be filled by _pick_place_single_attempt
-            }
+            # attempt_metrics_data = {
+            #     'attempt_number': attempt,
+            #     'retries': attempt - 1, # 0 for first attempt
+            #     # Other fields will be filled by _pick_place_single_attempt
+            # }
             # --- End METRIC Init for Attempt ---
 
             if attempt > 1: # This is a retry
@@ -320,20 +334,27 @@ class RobotController:
                 if not self.move_to_home_position():
                      logger.error(f"{self.name}: Failed to return to base position for retry. Aborting.")
                      # --- METRIC: Record failure for this retry attempt ---
-                     # We don't have detailed metrics from move_to_home, so create a minimal entry
-                     home_failure_metric = {
-                         'attempt_number': attempt,
-                         'retries': attempt - 1,
-                         'success': False,
-                         'failure_type': 'Timeout', # Or 'Execution'
-                         'total_time_seconds': None, # Could measure if timed
-                         'algorithm_used': 'IK', # Assuming home move uses IK
-                         'piece_type': 'N/A (Home Move)'
-                         # Add other relevant fields as needed
-                     }
-                     all_attempts_metrics.append(home_failure_metric)
+                    #  # We don't have detailed metrics from move_to_home, so create a minimal entry
+                    #  home_failure_metric = {
+                    #      'attempt_number': attempt,
+                    #      'retries': attempt - 1,
+                    #      'success': False,
+                    #      'failure_type': 'Timeout', # Or 'Execution'
+                    #      'total_time_seconds': None, # Could measure if timed
+                    #      'algorithm_used': 'IK', # Assuming home move uses IK
+                    #      'piece_type': 'N/A (Home Move)'
+                    #      # Add other relevant fields as needed
+                    #  }
+                     move_log_data.attempt_number = attempt
+                     move_log_data.retries = attempt - 1
+                     move_log_data.success = False
+                     move_log_data.failure_type = 'Timeout'
+                     move_log_data.total_time_seconds = None
+                     move_log_data.algorithm_used = 'IK'
+                     move_log_data.piece_type = 'N/A (Home Move)'
+                    #  all_attempts_metrics.append(home_failure_metric)
                      # --- End METRIC: Record failure ---
-                     return False, all_attempts_metrics # Return False and list of metrics so far
+                     return False
                 logger.info(f"{self.name}: Robot returned to base position. Proceeding with retry.")
 
             # --- METRIC: Record start time for the attempt ---
@@ -342,16 +363,16 @@ class RobotController:
 
             # --- METRIC: Attempt the pick and place sequence ---
             # Pass the metrics_logger if _pick_place_single_attempt needs it internally
-            success, metrics_from_attempt = self._pick_place_single_attempt(object_id, start_pos, target_pos) # , metrics_logger=metrics_logger if needed
+            success = self._pick_place_single_attempt(object_id, start_pos, target_pos,move_log_data) # , metrics_logger=metrics_logger if needed
             # --- METRIC: Record end time and finalize attempt time ---
             attempt_end_time = time.time()
             # Ensure total_time_seconds is set (it should be from _pick_place_single_attempt)
-            if metrics_from_attempt['total_time_seconds'] is None:
-                 metrics_from_attempt['total_time_seconds'] = attempt_end_time - attempt_start_time
+            if success:
+                move_log_data.total_time_seconds = attempt_end_time - attempt_start_time
             # --- End METRIC: Finalize time ---
 
             # --- METRIC: Append the metrics from this attempt to the list ---
-            all_attempts_metrics.append(metrics_from_attempt)
+            # all_attempts_metrics.append(metrics_from_attempt)
             # --- End METRIC: Append ---
 
             if success:
