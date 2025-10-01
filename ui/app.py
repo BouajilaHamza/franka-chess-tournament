@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -21,8 +21,8 @@ except ImportError as e:
 # DATABASE_PATH = 'robot_performance.db' # Usually derived from engine.url
 
 # --- UPDATED FUNCTION using SQLModel ---
-# @st.cache_data # Caching with SQLModel objects can be tricky. Let's manage cache keys carefully or disable for now.
 # Better to cache the final DataFrame result if needed, or handle caching at a higher level.
+@st.cache_data # Caching with SQLModel objects can be tricky. Let's manage cache keys carefully or disable for now.
 def load_experiment_names_sqlmodel():
     """Loads experiment names for selection using SQLModel."""
     if not SQLMODEL_AVAILABLE or engine is None:
@@ -103,8 +103,8 @@ def main():
     if not SQLMODEL_AVAILABLE:
         st.stop() # Stop the app if SQLModel setup failed
 
-    st.set_page_config(page_title="Chess Robot Performance Dashboard (SQLModel)", layout="wide")
-    st.title("♟️ Chess Robot Performance Dashboard (SQLModel)")
+    st.set_page_config(page_title="Chess Robot Performance Dashboard", layout="wide")
+    st.title("♟️ Chess Robot Performance Dashboard")
 
     # --- Sidebar for Controls ---
     st.sidebar.header("Controls")

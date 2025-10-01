@@ -132,8 +132,7 @@ class PlanningConfig(BaseModel):
     safety_distance_threshold: float = Field(default=0.05, gt=0.0, description="Safety distance threshold for direct path check")
     ompl_validity_checking_resolution: float = Field(default=0.05, gt=0.0, description="OMPL validity checking resolution")
     ompl_path_interpolation_steps: int = Field(default=15, ge=0, description="OMPL path interpolation steps")
-    
-    
+    ompl_clear_path_visualization: bool = Field(default=False, description="Whether to visualize clear OMPL path after execution")
     
     
     

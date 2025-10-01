@@ -46,7 +46,7 @@ def main():
     robot2_id = env_components['robot2']['id']
     robot2_arm_joints = env_components['robot2']['arm_joints']
     robot2_gripper_joints = env_components['robot2']['gripper_joints']
-
+    pid_to_piece_type = env_components['piece_id_to_piece_type']
 
     robot1_controller = RobotController(
         robot1_id, robot1_arm_joints, robot1_gripper_joints,
@@ -101,6 +101,7 @@ def main():
             chess_engine=engine,
             metrics_logger=metrics_logger,
             move_log_data=move_log_data,
+            pid_to_piece_type=pid_to_piece_type
         )
     except Exception as e:
         logger.error(f"Unexpected error in game loop: {e}")

@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from ui.models import Experiment, Move, FailureDetail
 from ui.database_setup import engine
-from ui.schemas import MoveData
+from ui.schemas import MoveData,ExperimentData
 import logging
 from datetime import datetime
 
@@ -16,6 +16,7 @@ class MetricsLoggerSQLModel:
         self.db_url = db_url # Not directly used here as engine is global, but kept for consistency
         self.current_experiment_id = None
         self.move_counter = 0
+        self.experiment:ExperimentData = None
 
     def start_experiment(self, name, notes=""):
         """Starts a new experiment run and gets an experiment ID.
@@ -27,7 +28,8 @@ class MetricsLoggerSQLModel:
         """
         try:
             with Session(engine) as session:
-                experiment = Experiment(name=name, notes=notes)
+                self.experiment = ExperimentData(name=name, notes=notes,start_time=datetime.utcnow(), status="running") # Validate input data
+                experiment = Experiment(**self.experiment.model_dump())
                 session.add(experiment)
                 session.commit()
                 session.refresh(experiment) # Get the ID after commit
@@ -55,7 +57,12 @@ class MetricsLoggerSQLModel:
 
         # --- Map dictionary data to SQLModel instance ---
         try:
-            move_record = Move(**move_log_data)
+            move_log_data.experiment_id = self.current_experiment_id
+            move_log_data.move_number = self.move_counter
+            if isinstance(move_log_data.timestamp, str):
+                move_log_data.timestamp = datetime.fromisoformat(move_log_data.timestamp)
+            logger.info(f"Logging SQLModel move: {move_log_data.model_dump()}")
+            move_record = Move(**move_log_data.model_dump())
 
             with Session(engine) as session:
                 session.add(move_record)

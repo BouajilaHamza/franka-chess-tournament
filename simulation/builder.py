@@ -104,6 +104,7 @@ class EnvironmentBuilder:
         self.piece_ids = {} # Dictionary to store piece_id -> square mapping
         self.square_to_world_coords = {} # Dictionary mapping chess notation (e.g., 'a1') to 3D world coordinates [x, y, z]
         self.is_built = False
+        self.pid_to_piece_type = {} # Dictionary mapping piece_id to piece type (e.g., 'pawn_w', 'rook_b', etc.)
 
     def connect(self):
         """Initialize PyBullet connection."""
@@ -230,7 +231,8 @@ class EnvironmentBuilder:
         if not self.square_to_world_coords:
              self._define_square_mapping() # Ensure mapping is defined first
 
-        
+        if not self.pid_to_piece_type:
+            self.pid_to_piece_type = {}
         initial_positions = {
             'a1': 'rook_w', 'b1': 'knight_w', 'c1': 'bishop_w', 'd1': 'queen_w', 'e1': 'king_w', 'f1': 'bishop_w', 'g1': 'knight_w', 'h1': 'rook_w',
             'a2': 'pawn_w', 'b2': 'pawn_w', 'c2': 'pawn_w', 'd2': 'pawn_w', 'e2': 'pawn_w', 'f2': 'pawn_w', 'g2': 'pawn_w', 'h2': 'pawn_w',
@@ -251,6 +253,7 @@ class EnvironmentBuilder:
             if piece_id is not None:
                 self.piece_ids[piece_id] = square # Map piece ID back to square name
                 logger.info(f"Loaded {piece_type} on square {square} at {world_pos} (ID: {piece_id})")
+                self.pid_to_piece_type[piece_id] = piece_type
             else:
                 logger.error(f"Failed to load {piece_type} on square {square} at {world_pos}")
 
@@ -322,6 +325,7 @@ class EnvironmentBuilder:
                 'arm_joints': self.robot2_arm_joints,
                 'gripper_joints': self.robot2_gripper_joints,
             },
-            'piece_ids': self.piece_ids.copy(), # Return a copy to prevent external modification
+            'piece_ids': self.piece_ids.copy(),
+            'piece_id_to_piece_type': self.pid_to_piece_type.copy(),
             'square_to_world_coords': self.square_to_world_coords.copy(), # Return a copy
             }

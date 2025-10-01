@@ -4,6 +4,8 @@ import logging
 from simulation.motion_planners.ompl_planner import OMPLPlanner
 from simulation.motion_planners.ik_planner import IKPlanner
 from configs.config import config
+from ui.schemas import MoveData
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class MotionCoordinator:
             logger.error(f"Coordinator: Error in safety check: {e}. Defaulting to OMPL.")
             return False # Default to OMPL if check fails
 
-    def move_smartly(self, ik_planner:IKPlanner, ompl_planner:OMPLPlanner, robot_id, arm_joints, ee_index, target_pos, target_orient,
+    def move_smartly(self, ik_planner:IKPlanner, ompl_planner:OMPLPlanner, robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data:MoveData,
                      log_msg="", held_object_id=None):
         """
         Intelligently choose between IK and OMPL based on obstacle proximity.
@@ -74,9 +76,9 @@ class MotionCoordinator:
         # Decide based on safety check
         if self.is_direct_path_safe(robot_id, ee_index, target_pos, held_object_id):
             logger.info(f"Coordinator: Smart Move - Direct path safe, using IK. {log_msg}")
-            return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient,
+            return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data,
                                             log_msg=f"(Smart IK) {log_msg}")
         else:
             logger.info(f"Coordinator: Smart Move - Obstacle risk, using OMPL. {log_msg}")
-            return ompl_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient,
+            return ompl_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data,
                                              log_msg=f"(Smart OMPL) {log_msg}", held_object_id=held_object_id)

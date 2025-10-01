@@ -4,7 +4,7 @@ import logging
 from .base_planner import MotionPlanner
 from configs.config import config
 from utils.helper_functions import wait
-
+from ui.schemas import MoveData
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +13,12 @@ logger = logging.getLogger(__name__)
 class IKPlanner(MotionPlanner):
     """Motion planner using direct inverse kinematics."""
 
-    def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="", **kwargs):
+    def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data:MoveData, log_msg="", **kwargs):
         """Move the robot's EE to a target pose using IK with validation."""
         if log_msg:
             logger.info(f"IK Planner: {log_msg}")
         try:
+            start_ik_time = time.time()
             goal_joint_positions = p.calculateInverseKinematics(
                 bodyUniqueId=robot_id,
                 endEffectorLinkIndex=ee_index,
@@ -29,8 +30,9 @@ class IKPlanner(MotionPlanner):
 
             current_positions = self._get_current_joint_states(robot_id, arm_joints)
             target_arm_positions = goal_joint_positions[:len(arm_joints)]
+            ik_duration = time.time() - start_ik_time
+            move_log_data.planning_time_seconds=ik_duration
 
-            # Interpolate movement for smoother transition
             for step in range(config.simulation.move_steps):
                 alpha = step / float(config.simulation.move_steps)
                 interp_positions = [
@@ -43,7 +45,7 @@ class IKPlanner(MotionPlanner):
 
             # Ensure final position is reached
             self._set_joint_positions(robot_id, arm_joints, target_arm_positions, config.robot.first.max_joint_force)
-            wait(config.simulation.settle_steps) # e.g., 100
+            wait(config.simulation.settle_steps)
 
             # --- Critical Fix: Verify EE reached the target X/Y ---
             # ee_state = p.getLinkState(robot_id, ee_index)

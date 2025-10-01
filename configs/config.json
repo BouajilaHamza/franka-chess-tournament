@@ -97,6 +97,7 @@
     "safety_distance_threshold": 0.1,
     "max_retries": 2,
     "ompl_validity_checking_resolution": 0.05,
-    "ompl_path_interpolation_steps": 15
+    "ompl_path_interpolation_steps": 15,
+    "ompl_clear_path_visualization": false
   }
 }

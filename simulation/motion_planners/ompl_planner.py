@@ -7,7 +7,7 @@ from .base_planner import MotionPlanner
 from .ik_planner import IKPlanner
 from configs.config import config
 from utils.helper_functions import wait
-
+from ui.schemas import MoveData
 
 
 
@@ -104,7 +104,7 @@ class OMPLPlanner(MotionPlanner):
         space.setup()
         si.setup()
 
-        # Calculate goal joint configuration using IK
+
         try:
             goal_joint_positions = p.calculateInverseKinematics(
                 bodyUniqueId=robot_id,
@@ -175,24 +175,73 @@ class OMPLPlanner(MotionPlanner):
             logger.error(f"OMPL Planner: Planning error: {e}")
             return None
 
-    def _execute_path(self, robot_id, arm_joints, waypoints):
+    def _calculate_min_distance_to_obstacles(self, robot_id):
+        """Calculate the minimum distance from the robot to all obstacles."""
+        min_distance = float('inf')
+        try:
+            for obstacle_id in self.all_obstacle_ids:
+                contacts = p.getClosestPoints(bodyA=obstacle_id, bodyB=robot_id, distance=10.0)
+                for contact in contacts:
+                    dist = contact[8] # Contact distance
+                    if dist < min_distance:
+                        min_distance = dist
+            return min_distance if min_distance != float('inf') else None
+        except Exception as e:
+            logger.error(f"OMPL Planner: Error calculating min distance to obstacles: {e}")
+            return None
+
+    def _execute_path(self, robot_id, arm_joints, waypoints,move_log_data:MoveData=None):
         """Execute a planned path by moving through the waypoints."""
+
+        start_exec_time = time.time()
+
         if not waypoints:
             logger.info("OMPL Planner: No waypoints to execute.")
+
+            end_exec_time = time.time()
+            execution_time_seconds = end_exec_time - start_exec_time
+            logger.debug(f"OMPL Planner: Execution time (no waypoints): {execution_time_seconds:.4f}s")
             return False
 
         logger.info(f"OMPL Planner: Executing path with {len(waypoints)} waypoints.")
-        for i, waypoint in enumerate(waypoints):
-            if not self._is_joint_config_valid(robot_id, arm_joints, waypoint):
-                logger.info(f"OMPL Planner: Invalid waypoint {i} during execution.")
-                return False
-            self._set_joint_positions(robot_id, arm_joints, waypoint, config.robot.first.max_joint_force)
-            wait(config.simulation.settle_steps, simulation_steps=config.simulation.step_delay)
 
-        logger.info("OMPL Planner: Path execution completed.")
-        return True
+        success = True
+        try:
+            min_distance_so_far = float('inf')
 
-    def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="", held_object_id=None, **kwargs):
+            for i, waypoint in enumerate(waypoints):
+
+                # if not self._is_joint_config_valid(robot_id, arm_joints, waypoint):
+                #     logger.warning(f"OMPL Planner: Invalid waypoint {i} during execution. Stopping.")
+                #     success = False
+                #     break # Stop execution on invalid waypoint
+                self._set_joint_positions(robot_id, arm_joints, waypoint, config.robot.first.max_joint_force)
+                current_min_dist = self._calculate_min_distance_to_obstacles(robot_id)
+                if current_min_dist < min_distance_so_far:
+                    min_distance_so_far = current_min_dist
+                wait(config.simulation.settle_steps, simulation_steps=config.simulation.step_delay)
+
+        except Exception as e:
+            logger.error(f"OMPL Planner: Error during path execution: {e}")
+            success = False
+        finally:
+
+            end_exec_time = time.time()
+            execution_time_seconds = end_exec_time - start_exec_time
+            logger.info(f"OMPL Planner: Path execution {'completed' if success else 'stopped'} in {execution_time_seconds:.4f}s.")
+
+            self.last_execution_time_seconds = execution_time_seconds
+            if move_log_data is not None:
+                move_log_data.min_collision_proximity_mm = min_distance_so_far * 1000.0 if min_distance_so_far != float('inf') else None
+                move_log_data.execution_time_seconds = execution_time_seconds
+        # Option 2: Modify return signature to include time
+        # return success, execution_time_seconds
+
+        # For now, sticking with original signature but storing internally
+        return success
+
+
+    def move_to_pose(self, robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data:MoveData, log_msg="",held_object_id=None,**kwargs):
         """Move the robot's EE to a target pose using OMPL for collision-free path planning."""
         if log_msg:
             logger.info(f"OMPL Planner: {log_msg}")
@@ -202,24 +251,26 @@ class OMPLPlanner(MotionPlanner):
         start_planning_time = time.time()
         waypoints = self._plan_motion(robot_id, arm_joints, ee_index, start_config, target_pos, target_orient, held_object_id=held_object_id)
         planning_time = time.time() - start_planning_time
+        move_log_data.planning_time_seconds = planning_time
+        
         if waypoints:
             # self.path_visualizer.visualize_path(robot_id, arm_joints, ee_index, waypoints) # Optional
             logger.info("OMPL Planner: Using collision-free path.")
-            success = self._execute_path(robot_id, arm_joints, waypoints)
+            success = self._execute_path(robot_id, arm_joints, waypoints,move_log_data=move_log_data)
             wait(config.simulation.settle_steps)
-            #self.path_visualizer.clear_path() # Optional
+            if config.planning.ompl_clear_path_visualization:
+                self.path_visualizer.clear_path()
             return success
         else:
             logger.info("OMPL Planner: Failed, using direct IK control as fallback.")
-            # Fallback to IK
-            ik_planner = IKPlanner() # Or pass an instance
+            ik_planner = IKPlanner()
             return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="OMPL Fallback IK")
 
 
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
         """Move the robot arm to the predefined home position."""
         # Delegate to IK planner for simplicity, or implement OMPL-based homing if needed.
-        ik_planner = IKPlanner() # Or pass an instance
+        ik_planner = IKPlanner()
         return ik_planner.move_to_home(robot_id, arm_joints, home_position, tolerance, timeout)
 
 

@@ -5,12 +5,8 @@ import chess
 import pybullet as p
 import time
 from typing import Dict, Any
-
-# --- CHANGED: Import the MetricsLoggerSQLModel ---
-# Adjust the import path according to your project structure
-# Assuming it's defined in configs/logger_config.py
-from configs.logger_config import MetricsLoggerSQLModel # Or wherever it's located
-
+from datetime import datetime
+from configs.logger_config import MetricsLoggerSQLModel
 from simulation.robot_controller import RobotController
 from simulation.chess_engine import ChessEngine
 
@@ -24,6 +20,7 @@ def run_game_loop(
     chess_engine: ChessEngine,
     metrics_logger: MetricsLoggerSQLModel,
     move_log_data: MoveData,
+    pid_to_piece_type: Dict[int, str] = None
 ):
     """
     Main game loop integrating perception, decision (engine), and control (robot).
@@ -72,7 +69,7 @@ def run_game_loop(
 
         if robot_move_uci is None:
             logger.info("Engine returned no move. Game might be over.")
-            board_state = chess_engine.get_internal_board()
+            _board_state = chess_engine.get_internal_board()
             # ... (game over checks - unchanged) ...
             game_over = True
             break
@@ -109,30 +106,10 @@ def run_game_loop(
         move_log_data.source_square=start_square_name
         move_log_data.target_square=target_square_name
         move_log_data.piece_id=piece_id_to_move
+        move_log_data.piece_type=pid_to_piece_type.get(piece_id_to_move, "unknown")
+        move_log_data.timestamp=datetime.now()
 
-        
-        # move_log_data = {
-        #     'move_number': move_count,
-        #     'robot_name': robot_name,
-        #     'robot_color': robot_color,
-        #     'source_square': start_square_name,
-        #     'target_square': target_square_name,
-        #     'piece_id': piece_id_to_move,
-        #     # --- Data to be filled by the controller or post-processing ---
-        #     'success': None,
-        #     'failure_type': None,
-        #     'total_time_seconds': None,
-        #     'planning_time_seconds': None,
-        #     'execution_time_seconds': None,
-        #     'placement_error_mm': None,
-        #     'min_collision_proximity_mm': None,
-        #     'algorithm_used': None,
-        #     'retries': None,
-        #     'piece_type': None,
-        #     # --- End data to be filled ---
-        # }
-
-        # --- NEW: Record start time for total move time ---
+   
         move_start_time = time.time()
 
         # --- CHANGED: Call the controller's method ---

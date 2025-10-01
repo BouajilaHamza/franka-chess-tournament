@@ -1,7 +1,7 @@
 from pydantic import BaseModel,ConfigDict
 from typing import Optional
+from datetime import  datetime
 import enum
-
 
 class FailureTypeEnum(str, enum.Enum):
     IK = "IK"
@@ -18,24 +18,26 @@ class AlgorithmUsedEnum(str, enum.Enum):
     
 
 class ExperimentData(BaseModel):
+    model_config = ConfigDict(validate_assignment=True) # Enable validation on assignment
+
     id: Optional[int] = None
     name: str
-    start_time: str
-    end_time: Optional[str] = None
+    start_time: datetime
+    end_time: Optional[datetime] = None
     config_hash: Optional[str] = None
-    git_commit: Optional[str] = None
     notes: Optional[str] = None
     status: str
     
-    moves: Optional[list["MoveData"]]
+    # moves: Optional[list["MoveData"]] = []
 
 
 class MoveData(BaseModel):
     model_config = ConfigDict(validate_assignment=True) # Enable validation on assignment
 
     id: int = None
+    experiment_id: int = None
     move_number: int = None
-    timestamp: str = None
+    timestamp: datetime = None
     robot_name: str = None
     robot_color: str = None
     source_square: Optional[str] = None
@@ -50,15 +52,15 @@ class MoveData(BaseModel):
     placement_error_mm: Optional[float] = None
     min_collision_proximity_mm: Optional[float] = None
     algorithm_used: str = None
-    retries: int = None
+    retries: int = 0
     attempt_number: Optional[int] = 0
-    experiment:Optional[ExperimentData] = None
-    failure_details: Optional[list["FailureDetail"]] = None
+    # experiment:Optional[ExperimentData] = None
+    # failure_details: Optional[list["FailureDetail"]] = []
 
 class FailureDetail(BaseModel):
     id: Optional[int] = None
     move_id: int
     error_message: Optional[str] = None
     snapshot_data: Optional[str] = None
-    move:Optional["MoveData"]
+    # move:Optional["MoveData"]
 

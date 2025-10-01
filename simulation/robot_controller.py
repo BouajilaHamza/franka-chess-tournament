@@ -50,24 +50,26 @@ class RobotController:
             )
 
     # --- Movement Functions (Delegating to Planners/Coordinator) ---
-    def move_to_position_ik(self, target_pos, target_orient, log_msg=""):
+    def move_to_position_ik(self, target_pos, target_orient,move_log_data:MoveData, log_msg=""):
         """Move using direct IK."""
         return self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                           target_pos, target_orient, log_msg=log_msg)
+                                           target_pos, target_orient,move_log_data=move_log_data, log_msg=log_msg)
 
-    def move_to_position_ompl(self, target_pos, target_orient, log_msg="", held_object_id=None):
+    def move_to_position_ompl(self, target_pos, target_orient,move_log_data:MoveData, log_msg="", held_object_id=None):
         """Move using OMPL planning."""
         # Pass held_object_id to OMPL planner if needed within its logic
         return self.ompl_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                             target_pos, target_orient, log_msg=log_msg,
+                                             target_pos, target_orient, 
+                                             move_log_data=move_log_data, 
+                                             log_msg=log_msg,
                                              held_object_id=held_object_id)
 
-    def move_smartly_to_position(self, target_pos, target_orient, log_msg="", held_object_id=None):
+    def move_smartly_to_position(self, target_pos, target_orient,move_log_data:MoveData, log_msg="", held_object_id=None):
         """Move using the smart coordinator to choose IK or OMPL."""
         return self.coordinator.move_smartly(
             self.ik_planner, self.ompl_planner,
             self.id, self.arm_joints, self.ee_index,
-            target_pos, target_orient, log_msg=log_msg, held_object_id=held_object_id
+            target_pos, target_orient,move_log_data=move_log_data, log_msg=log_msg, held_object_id=held_object_id
         )
 
     def move_to_home_position(self, tolerance=None, timeout=None):
@@ -113,23 +115,7 @@ class RobotController:
             bool: success_boolean
         """
         logger.info(f"{self.name}: --- Starting Pick and Place Single Attempt ---")
-        attempt_start_time = time.time() # --- METRIC: Start time ---
-
-        # --- METRIC: Initialize metrics dictionary ---
-        # metrics_data = {
-        #     "move_number": 1,
-        #     'success': False, # Default assumption
-        #     'failure_type': None, # 'IK', 'OMPL', 'Grasp', 'Execution', 'Timeout'
-        #     'total_time_seconds': None, # Will be calculated at the end
-        #     'planning_time_seconds': 0.0, # Placeholder, can be refined per planner call if needed
-        #     'execution_time_seconds': 0.0, # Placeholder, can be refined per execution if needed
-        #     'placement_error_mm': None, # To be calculated if needed (requires object final pos)
-        #     'min_collision_proximity_mm': None, # If tracked by planners
-        #     'algorithm_used': None, # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
-        #     'retries': 0, # This is handled by pick_and_place_with_retry
-        #     'piece_type': 'unknown', # Derive from object_id if needed
-        #     # Add more specific timing/phases if required by planners/coordinator
-        # }
+        attempt_start_time = time.time()
 
         move_log_data.move_number=1
         move_log_data.success=False # Default assumption
@@ -140,10 +126,8 @@ class RobotController:
         move_log_data.placement_error_mm=None # To be calculated if needed (requires object final pos)
         move_log_data.min_collision_proximity_mm=None # If tracked by planners
         move_log_data.algorithm_used="IK" # 'IK', 'OMPL', 'Hybrid' (from coordinator/planners)
-        move_log_data.piece_type='unknown' # Derive from object_id if needed
 
 
-        # --- End METRIC Init ---
 
         start_surface_z = start_pos[2]
         target_surface_z = target_pos[2]
@@ -154,21 +138,26 @@ class RobotController:
         self._set_gripper_position(config.robot.first.gripper_open)
         wait(config.simulation.settle_steps // 2)
         # Use SMART movement for approach
-        if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                    pick_approach_pos, config.pick_place.ee_down_orientation,
-                                    log_msg="Pick approach"):
+        if not self.ik_planner.move_to_pose(self.id, 
+                                            self.arm_joints, self.ee_index,
+                                            pick_approach_pos, 
+                                            config.pick_place.ee_down_orientation,
+                                            move_log_data=move_log_data,
+                                            log_msg="Pick approach"):
             logger.error(f"{self.name}: 1a. Failed to move above object.")
-            move_log_data.algorithm_used = 'IK' # Or 'Execution'
+            move_log_data.algorithm_used = 'IK'
             move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False # --- METRIC: Return on failure ---
+            return False
 
         # b. Move down to grasp position
         grasp_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.pick_z_offset]
         # Use SMART movement for grasp approach
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,
-                                    grasp_pos, config.pick_place.ee_down_orientation,log_msg="Grasp approach"):
+                                    grasp_pos, config.pick_place.ee_down_orientation,
+                                    move_log_data=move_log_data,
+                                    log_msg="Grasp approach"):
             logger.error(f"{self.name}: 1b. Failed to move to grasp position.")
-            move_log_data.failure_type = 'IK' # Or 'Execution'
+            move_log_data.failure_type = 'IK'
             move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
             return False # --- METRIC: Return on failure ---
 
@@ -193,7 +182,8 @@ class RobotController:
         self.held_object_id = object_id # Update state
         logger.debug(f"(Held object ID: {self.held_object_id})")
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos, config.pick_place.ee_down_orientation,
-                                log_msg="1e. Lifting object..."):
+                                            move_log_data=move_log_data,
+                                            log_msg="1e. Lifting object..."):
             logger.error(f"{self.name}: 1e. Failed to lift object.")
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
@@ -210,19 +200,19 @@ class RobotController:
         # --- METRIC: Potentially capture algorithm used ---
         # This requires the coordinator/planners to return this info, which is complex.
         # For now, we acknowledge the attempt was made.
-        if not self.move_smartly_to_position(place_approach_pos, config.pick_place.ee_down_orientation,
+        if not self.move_smartly_to_position(place_approach_pos, config.pick_place.ee_down_orientation,move_log_data=move_log_data,
                                 log_msg="2a. Moving above target...", held_object_id=object_id):
             logger.error(f"{self.name}: 2a. Failed to move above target.")
 
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-            self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,
+            self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,move_log_data=move_log_data,
                                         log_msg="  -> Dropping object back (failed move to target)...",
                                         held_object_id=object_id)
             self._set_gripper_position(config.robot.first.gripper_open)
             wait(config.simulation.gripper_action_steps)
             lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
             # Move away after drop without holding
-            self.move_smartly_to_position(lift_pos_after_drop, config.pick_place.ee_down_orientation,
+            self.move_smartly_to_position(lift_pos_after_drop, config.pick_place.ee_down_orientation,move_log_data=move_log_data,
                                         log_msg="  -> Lifting after drop...", held_object_id=None)
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
@@ -234,11 +224,12 @@ class RobotController:
         release_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.place_z_offset]
 
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,release_pos, config.pick_place.ee_down_orientation,
-                                log_msg="2b. Moving down to place..."):
+                                            move_log_data=move_log_data,
+                                            log_msg="2b. Moving down to place..."):
             logger.error(f"{self.name}: 2b. Failed to move to place position.")
             # Drop object back
             drop_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
-            self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,
+            self.move_smartly_to_position(drop_pos, config.pick_place.ee_down_orientation,move_log_data=move_log_data,
                                         log_msg="  -> Dropping object back (failed place)...",
                                         held_object_id=object_id)
             self._set_gripper_position(config.robot.first.gripper_open)
@@ -246,6 +237,7 @@ class RobotController:
             lift_pos_after_drop = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z + 0.05]
 
             self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,lift_pos_after_drop, config.pick_place.ee_down_orientation,
+                                         move_log_data=move_log_data,
                                         log_msg="  -> Lifting after drop...")
             self.held_object_id = None
             logger.debug(f"(Held object ID: {self.held_object_id})")
@@ -264,7 +256,8 @@ class RobotController:
         retreat_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
 
         if not self.ik_planner.move_to_pose(self.id, self.arm_joints, self.ee_index,retreat_pos, config.pick_place.ee_down_orientation,
-                                log_msg="2d. Retreating..."):
+                                            move_log_data=move_log_data,
+                                            log_msg="2d. Retreating..."):
             logger.warning(f"{self.name}: 2d. Failed to fully retreat after placing (not critical).")
 
         # --- METRIC: Finalize and Return Success ---
