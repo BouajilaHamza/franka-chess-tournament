@@ -90,7 +90,7 @@ class IKPlanner(MotionPlanner):
             start_time = time.time()
             while time.time() - start_time < timeout:
                 p.stepSimulation()
-                time.sleep(config.simulation.step_delay)
+                time.sleep(0.001)
 
                 joints_at_target = True
                 for i, joint_idx in enumerate(arm_joints):

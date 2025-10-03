@@ -82,18 +82,22 @@ class RobotController:
                                           tolerance=tolerance, timeout=timeout)
 
 
-
+    def _get_ee_position(self):
+        """Get the current end-effector position."""
+        ee_state = p.getLinkState(self.id, self.ee_index)
+        return ee_state[0]  # Position is the first element
     def verify_grasp(self, object_id, expected_pos, timeout=1.0):
         """Basic check if the object is likely grasped."""
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                # ee_pos = self._get_ee_position() # Implement if needed
+                ee_pos = self._get_ee_position() # Implement if needed
                 obj_pos, _ = p.getBasePositionAndOrientation(object_id)
-                # distance = np.linalg.norm(np.array(obj_pos) - np.array(ee_pos))
+                distance = np.linalg.norm(np.array(obj_pos) - np.array(ee_pos))
                 logger.info(f"{self.name}:   -> EE Position: ..., Expected Object Pos: {expected_pos}, Actual Object Pos: {obj_pos}, Distance: ...m ")
-                # if distance < 0.5: # Threshold, adjust based on object size
-                return True # Simplified for example
+                if distance < 0.03: # Threshold, adjust based on object size
+                    return True # Simplified for example
+                return False
             except p.error:
                 logger.info(f"{self.name}:   -> Object no longer exists, assuming it was grasped and moved.")
                 return True
@@ -166,15 +170,7 @@ class RobotController:
         self._set_gripper_position(config.robot.first.gripper_closed)
         wait(config.simulation.gripper_action_steps)
 
-        # d. Verify grasp (basic check)
-        if not self.verify_grasp(object_id, grasp_pos):
-            logger.warning(f"{self.name}: 1d. Grasp verification failed.")
-            self._set_gripper_position(config.robot.first.gripper_open)
-            wait(config.simulation.gripper_action_steps)
-            move_log_data.failure_type = 'Grasp'
-            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
-            return False # --- METRIC: Return on failure ---
-        logger.info(f"{self.name}: 1d. Grasp verified.")
+
 
         # e. Lift the object (force should keep it attached)
         lift_pos = [start_pos[0], start_pos[1], start_surface_z + config.pick_place.clearance_z]
@@ -193,6 +189,14 @@ class RobotController:
             move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
             return False # --- METRIC: Return on failure ---
 
+        if not self.verify_grasp(object_id, grasp_pos):
+            logger.warning(f"{self.name}: 1d. Grasp verification failed.")
+            self._set_gripper_position(config.robot.first.gripper_open)
+            wait(config.simulation.gripper_action_steps)
+            move_log_data.failure_type = 'Grasp'
+            move_log_data.total_time_seconds = time.time() - attempt_start_time # --- METRIC: End time on failure ---
+            return False # --- METRIC: Return on failure ---
+        logger.info(f"{self.name}: 1d. Grasp verified.")
         # 2. --- PLACING PHASE ---
         # a. Move above the target location (correct X, Y from the start)
         place_approach_pos = [target_pos[0], target_pos[1], target_surface_z + config.pick_place.clearance_z]
