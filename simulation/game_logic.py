@@ -96,10 +96,12 @@ def run_game_loop(
             logger.error(f"Could not find a piece at square {start_square_name} to move.")
             game_over = True
             break
+        
+        logger.info(f"Target Square World pose : {start_pos_world}")
+        start_pos_world = p.getBasePositionAndOrientation(piece_id_to_move)[0]
 
-        # 6. --- Execute the move ---
         logger.info(f"{robot_name} executing move: Pick {piece_id_to_move} from {start_square_name}, place at {target_square_name}")
-
+        logger.info(f"  -> Start Pos: {start_pos_world}, Target Piece Pos: {target_pos_world}")
         move_log_data.move_number=move_count
         move_log_data.robot_name=robot_name
         move_log_data.robot_color=robot_color
@@ -112,21 +114,8 @@ def run_game_loop(
    
         move_start_time = time.time()
 
-        # --- CHANGED: Call the controller's method ---
-        # The controller is responsible for filling move_log_data and calling metrics_logger.log_move()
-        # OR returning success and a list of metric dicts.
-        # success = controller_to_move.pick_and_place_with_retry(
-        #     object_id=piece_id_to_move,
-        #     start_pos=start_pos_world,
-        #     target_pos=target_pos_world,
-        #     max_retries=getattr(controller_to_move, 'max_retries', 2),
-        #     metrics_logger=metrics_logger, # Pass the logger
-        #     move_log_data=move_log_data # Pass the data dict to be populated
-        # )
 
-        # --- ALTERNATIVE APPROACH: Controller returns (success, [metrics_dict, ...]) ---
-        # The controller just performs the move and returns success/metrics.
-        # The game loop handles logging.
+        
         success = controller_to_move.pick_and_place_with_retry(
             object_id=piece_id_to_move,
             start_pos=start_pos_world,
@@ -139,14 +128,8 @@ def run_game_loop(
         move_end_time = time.time()
         move_log_data.total_time_seconds = move_end_time - move_start_time
 
-        # --- CHANGED: Handle the result from the controller ---
-        # Assume pick_and_place_with_retry now returns a tuple: (success_bool, list_of_metrics_dicts)
-        #success = False # Default assumption
-        # --- NEW: Log the move data using the metrics logger ---
-        # Ensure 'success' is explicitly set in move_log_data based on the `success` variable
-        # if it wasn't already updated by the controller's returned metrics.
-        # This step is mostly covered by final_metrics_dict['success'] = success above,
-        # but as a final safeguard:
+
+        
         if move_log_data.success is None:
              move_log_data.success = success
 

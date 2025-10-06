@@ -264,7 +264,7 @@ class OMPLPlanner(MotionPlanner):
         else:
             logger.info("OMPL Planner: Failed, using direct IK control as fallback.")
             ik_planner = IKPlanner()
-            return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient, log_msg="OMPL Fallback IK")
+            return ik_planner.move_to_pose(robot_id, arm_joints, ee_index, target_pos, target_orient,move_log_data, log_msg="OMPL Fallback IK")
 
 
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
