@@ -69,7 +69,7 @@ class IKPlanner(MotionPlanner):
     def move_to_home(self, robot_id, arm_joints, home_position, tolerance=None, timeout=None, **kwargs):
         """Move the robot arm to the predefined home position."""
         tolerance = tolerance or config.robot.first.home_position_tolerance # e.g., 0.01
-        timeout = timeout or config.robot.first.home_move_timeout # e.g., 5.0
+        timeout = timeout or config.pick_place.home_move_timeout # e.g., 5.0
 
         logger.info("IK Planner: Moving to home position...") # Use logger
         if not home_position or len(home_position) < len(arm_joints):
@@ -90,8 +90,8 @@ class IKPlanner(MotionPlanner):
             start_time = time.time()
             while time.time() - start_time < timeout:
                 p.stepSimulation()
-                time.sleep(0.001)
 
+                wait(config.simulation.settle_steps,config.simulation.step_delay) # Short wait
                 joints_at_target = True
                 for i, joint_idx in enumerate(arm_joints):
                     current_pos = p.getJointState(robot_id, joint_idx)[0]
@@ -101,7 +101,7 @@ class IKPlanner(MotionPlanner):
 
                 if joints_at_target:
                     logger.info("IK Planner: Successfully reached home position.") # Use logger
-                    wait(config.simulation.settle_steps // 2) # Brief pause to settle
+                    # wait(config.simulation.settle_steps // 2) # Brief pause to settle
                     return True
 
             logger.info("IK Planner: Timeout waiting for robot to reach home position.") # Use logger

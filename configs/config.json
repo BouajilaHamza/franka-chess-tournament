@@ -17,19 +17,18 @@
     "start_orientation": [0, 0, 0, 1],
     "end_effector_index": 11,
     "num_arm_joints": 7,
-    "max_joint_force": 240.0,
-    "gripper_force": 240.0,
+    "max_joint_force": 70.0,
+    "gripper_force": 70.0,
     "gripper_open": 0.02,
     "gripper_closed": 0.0,
-    "gripper_lateral_friction": 1.5,
+    "gripper_lateral_friction": 0.7,
     "gripper_spinning_friction": 0.1,
     "gripper_rolling_friction": 0.1,
     "gripper_restitution": 0.0,
     "gripper_contact_stiffness": 30000.0,
     "gripper_contact_damping": 1000.0,
     "home_position": [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785],
-    "home_position_tolerance": 0.01,
-    "home_move_timeout": 5.0
+    "home_position_tolerance": 0.01
   },
     "second":{
     "urdf": "franka_panda/panda.urdf",
@@ -39,8 +38,8 @@
     "num_arm_joints": 7,
     "max_joint_force": 70.0,
     "gripper_force": 70.0,
-    "gripper_open": 0.02,
-    "gripper_lateral_friction": 0.6,
+    "gripper_open": 0.025,
+    "gripper_lateral_friction": 0.7,
     "gripper_spinning_friction": 0.1,
     "gripper_rolling_friction": 0.1,
     "gripper_restitution": 0.0,
@@ -48,8 +47,7 @@
     "gripper_contact_damping": 1000.0,
     "gripper_closed": 0.0,
     "home_position": [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785],
-    "home_position_tolerance": 0.01,
-    "home_move_timeout": 5.0
+    "home_position_tolerance": 0.01
   }
   },
   "environment": {
@@ -71,10 +69,10 @@
     "pawn_target_pos": [0.7, 0, 0.02],
     "white_pawns": [],
     "black_pawns": [],
-    "piece_mass" : 0.07,
+    "piece_mass" : 0.09,
     "piece_height" : 0.05,
     "piece_radius" : 0.02,
-    "piece_lateral_friction" : 0.5,
+    "piece_lateral_friction" : 0.6,
     "piece_spinning_friction" : 0.01,
     "piece_rolling_friction" : 0.1,
     "piece_restitution" : 0.01,
@@ -88,10 +86,12 @@
     "place_z_offset": 0.015,
     "ee_down_orientation": [3.141592653589793, 0, 0],
     "xy_tolerance": 0.03,
-    "z_tolerance": 0.005
+    "z_tolerance": 0.005,
+    "home_move_timeout": 7.0
   },
   "task": {
-    "max_retries": 2
+    "max_retries": 2,
+    "max_moves": 200
   },
   "planning": {
     "safety_distance_threshold": 0.25,
