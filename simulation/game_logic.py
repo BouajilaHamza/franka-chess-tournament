@@ -12,8 +12,8 @@ from ui.schemas import MoveData
 from simulation.chess_engine import ChessEngine
 from simulation.robot_controller import RobotController
 from simulation.perception import find_piece_id_at_square
-from simulation.special_moves import handle_kingside_castling, handle_queenside_castling
-# from utils.helper_functions import wait
+from simulation.special_moves import handle_kingside_castling, handle_queenside_castling,handle_captured_piece
+
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +153,20 @@ def run_game_loop(
             move_log_data=normal_move_log_data # Pass log data
         )
 
-        # Update engine and log result
+
         if success:
+            # Call the function right after a successful placement
+            capture_handled = handle_captured_piece(
+                target_square_name=target_square_name,
+                attacker_piece_id=piece_id_to_move, # The piece that just moved and captured
+                env_components=env_components,
+                robot_controller=controller_to_move # Use the controller that just moved, or decide on a specific one
+            )
+            if not capture_handled:
+                logger.warning(f"Failed to handle potential capture on {target_square_name}.")
+                # Decide if this is critical enough to stop the game or just log the issue
+                # game_over = True # Uncomment if capture failure is critical
+            # --- END NEW ---
             chess_engine.update_internal_board(robot_move_uci)
             normal_move_log_data.success = True
             logger.info(f"{robot_name} successfully executed normal move.")

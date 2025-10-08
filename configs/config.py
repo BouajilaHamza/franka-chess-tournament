@@ -5,6 +5,10 @@ from typing import List
 
 
 
+DEAD_PIECES_AREA_CENTER = [0.1, 0.0, 0.05] # Example: Left side of the board, slightly elevated
+DEAD_PIECES_AREA_SIZE = [0.2, 0.4, 0.1]   # Example: 20cm x 40cm x 10cm area
+
+
 with open('configs/config.json', 'r') as f:
     CONFIG = json.load(f)
 

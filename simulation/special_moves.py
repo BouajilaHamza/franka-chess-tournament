@@ -1,7 +1,12 @@
-import logging
 import chess
+import random
+import logging
+import numpy as np
+import pybullet as p
+
 from simulation.robot_controller import RobotController
 from ui.schemas import MoveData
+from configs.config import config, DEAD_PIECES_AREA_CENTER, DEAD_PIECES_AREA_SIZE
 
 try:
     from simulation.perception import find_piece_id_at_square
@@ -11,6 +16,9 @@ except ImportError as e:
     logger.error(f"Error importing perception module: {e}. Castling logic will fail.")
     PERCEPTION_AVAILABLE = False
     find_piece_id_at_square = None
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +62,122 @@ def _get_piece_id_at_square(square_name: str, env_components: dict) -> int | Non
 
 
 
+
+def handle_captured_piece(target_square_name:str, attacker_piece_id:int, env_components:dict, robot_controller:RobotController):
+    """
+    Checks if a piece was captured on the target square and moves it aside.
+
+    Args:
+        target_square_name (str): The name of the square where the attacker was placed (e.g., 'e4').
+        attacker_piece_id (int): The PyBullet ID of the piece that just moved (the attacker).
+        env_components (dict): Environment components including square_to_world_coords and piece_ids.
+        robot_controller (RobotController): The controller to use for moving the captured piece.
+
+    Returns:
+        bool: True if handling was successful (no capture or capture moved), False otherwise.
+    """
+    logger.info(f"Checking for captured piece on square {target_square_name} after placing attacker ID {attacker_piece_id}...")
+    square_to_world = env_components.get('square_to_world_coords', {})
+    all_piece_ids = env_components.get('piece_ids', {}).keys()
+    target_pos = square_to_world.get(target_square_name)
+
+    if target_pos is None:
+        logger.error(f"Target square {target_square_name} not found in mapping.")
+        return False
+
+    # --- 1. Find all piece IDs currently near the target square ---
+    # Use a small tolerance to find pieces considered "on" the square
+    TOLERANCE = 0.02 # 2cm tolerance, adjust based on piece/bucket size
+    pieces_on_square = []
+    for piece_id in all_piece_ids:
+        try:
+            piece_pos, _ = p.getBasePositionAndOrientation(piece_id)
+            distance = np.linalg.norm(np.array(piece_pos[:2]) - np.array(target_pos[:2])) # Compare X,Y only
+            if distance <= TOLERANCE:
+                pieces_on_square.append(piece_id)
+        except p.error:
+            # Piece might have been removed already
+            continue
+
+    logger.debug(f"Pieces found near {target_square_name}: {pieces_on_square}")
+
+    # --- 2. Identify the captured piece ---
+    if len(pieces_on_square) < 1:
+        logger.warning(f"No pieces found near {target_square_name} after placing attacker. This is unexpected.")
+        return True # Technically no capture to handle
+    elif len(pieces_on_square) == 1:
+        piece_on_square_id = pieces_on_square[0]
+        if piece_on_square_id == attacker_piece_id:
+            logger.info(f"Only the attacker piece {attacker_piece_id} found on {target_square_name}. No capture occurred.")
+            return True # No capture
+        else:
+            # This shouldn't happen if the attacker was just placed correctly
+            logger.warning(f"Only piece {piece_on_square_id} found on {target_square_name}, but it's not the attacker {attacker_piece_id}. Possible placement error?")
+            # Assume the one present is the captured one? Or treat as error?
+            captured_piece_id = piece_on_square_id
+    else: # len(pieces_on_square) > 1
+        logger.info(f"Multiple pieces found on {target_square_name}: {pieces_on_square}. Capture detected.")
+        # Assume the one that is NOT the attacker is the captured piece
+        # (This handles the case where pieces might overlap slightly in simulation)
+        captured_candidates = [pid for pid in pieces_on_square if pid != attacker_piece_id]
+        if len(captured_candidates) == 1:
+            captured_piece_id = captured_candidates[0]
+            logger.info(f"Identified captured piece ID: {captured_piece_id}")
+        elif len(captured_candidates) > 1:
+            logger.warning(f"Multiple captured candidates found: {captured_candidates}. Arbitrarily choosing the first one.")
+            captured_piece_id = captured_candidates[0] # Arbitrary choice, might need better logic
+        else:
+            # This means the attacker isn't in the list, which is strange
+            logger.error(f"Attacker {attacker_piece_id} not found in pieces_on_square {pieces_on_square} but multiple pieces are present. Logic error?")
+            return False
+
+    # --- 3. Move the captured piece outside the board ---
+    if captured_piece_id == attacker_piece_id:
+        logger.info("Piece on square is the attacker itself. No capture to handle.")
+        return True
+
+    logger.info(f"Moving captured piece {captured_piece_id} out of play...")
+
+    # --- 4. Calculate a random position within the dead pieces area ---
+    # Define the bounds of the area
+    center = np.array(DEAD_PIECES_AREA_CENTER)
+    size = np.array(DEAD_PIECES_AREA_SIZE)
+    half_size = size / 2.0
+
+    # Generate a random position within the area (X, Y) and keep Z constant or slightly random
+    random_x = random.uniform(center[0] - half_size[0], center[0] + half_size[0])
+    random_y = random.uniform(center[1] - half_size[1], center[1] + half_size[1])
+    # Keep Z constant or add a small random height variation
+    random_z = center[2] # + random.uniform(-0.01, 0.01) # Optional slight Z variation
+
+    target_drop_pos = [random_x, random_y, random_z]
+    _target_drop_orient = p.getQuaternionFromEuler([0, 0, 0]) # Upright orientation, or match board orientation
+
+    logger.info(f"Dropping captured piece {captured_piece_id} at random position {target_drop_pos}...")
+
+
+    try:
+        current_piece_pos, _ = p.getBasePositionAndOrientation(captured_piece_id)
+    except p.error:
+        logger.warning(f"Captured piece {captured_piece_id} no longer exists. Assuming it was already handled or removed.")
+        return True # Piece is gone, nothing to do
+    success = robot_controller.pick_and_place_with_retry(
+        object_id=captured_piece_id,
+        start_pos=current_piece_pos, # Pick from its current location on the board
+        target_pos=target_drop_pos,   # Place in the dead pieces area
+        max_retries=config.task.max_retries, # Use config value
+        move_log_data=MoveData()
+    )
+
+    if success:
+        logger.info(f"Successfully moved captured piece {captured_piece_id} to dead pieces area at {target_drop_pos}.")
+        # Optional: Update internal game state tracking if you maintain a list of active/inactive pieces
+        # env_components['inactive_piece_ids'].add(captured_piece_id) # If you have such a set
+        # env_components['piece_ids'].pop(captured_piece_id, None) # Remove from active list if needed
+        return True
+    else:
+        logger.error(f"Failed to move captured piece {captured_piece_id} to dead pieces area.")
+        return False # Indicate failure in handling the capture
 
 
 
@@ -127,7 +251,7 @@ def handle_kingside_castling(
     if king_piece_id is None:
         logger.error(f"{robot_controller.name}: Could not find King piece at {king_start_name} for castling.")
         move_log_data.success = False
-        move_log_data.failure_type = "Castling_Error_King_Not_Found"
+        move_log_data.failure_type = "Execution"
         return False
     if rook_piece_id is None:
         logger.error(f"{robot_controller.name}: Could not find Rook piece at {rook_start_name} for castling.")
@@ -322,3 +446,108 @@ def handle_queenside_castling(
     return castling_success
 
 # Add other special moves (en passant, promotion) here if needed
+
+def handle_checkmate(robot_controller, move_log_data):
+    """
+    Handles the physical execution of a checkmate.
+    """
+    logger.info(f"{robot_controller.name}: Handling Checkmate...")
+
+#TODO: Implement checkmate handling if any physical action is needed
+def handle_promotion(robot_controller, board_before_move, promotion_move_uci, env_components, move_log_data):
+    """
+    Handles the physical execution of a pawn promotion move.
+    """
+    pass
+
+
+#TODO: Implement en passant handling if any physical action is needed   
+def handle_en_passant(robot_controller, board_before_move, en_passant_move_uci, env_components, move_log_data):
+    logger.info(f"{robot_controller.name}: Handling En Passant...")
+    pass
+
+
+
+def move_captured_pieces_to_bins(captured_piece_ids, env_components, robot_controller):
+    """
+    Move captured pieces to their respective color bins.
+    
+    Args:
+        captured_piece_ids (set): Set of IDs of pieces that were captured.
+        env_components (dict): Environment components including piece_id_to_piece_type and bin_ids.
+        robot_controller (RobotController): The robot controller to use for moving pieces.
+    """
+    if not captured_piece_ids:
+        logger.info("No pieces captured, no need to move to bins.")
+        return True
+
+    piece_id_to_type = env_components.get('piece_id_to_piece_type', {})
+    bin_ids = env_components.get('bin_ids', {})
+    
+    white_bin_id = bin_ids.get("captured_white_bin")
+    black_bin_id = bin_ids.get("captured_black_bin")
+
+    if not white_bin_id or not black_bin_id:
+        logger.error("Captured piece bins not found in environment components.")
+        return False
+
+    # Get bin positions (center top)
+    try:
+        white_bin_pos, white_bin_orn = p.getBasePositionAndOrientation(white_bin_id)
+        black_bin_pos, black_bin_orn = p.getBasePositionAndOrientation(black_bin_id)
+        # Calculate a position slightly above the center of the bin for dropping
+        white_bin_drop_pos = [white_bin_pos[0], white_bin_pos[1], white_bin_pos[2] + config.environment.bin_size[2] + 0.05] # Z + height + clearance
+        black_bin_drop_pos = [black_bin_pos[0], black_bin_pos[1], black_bin_pos[2] + config.environment.bin_size[2] + 0.05]
+    except Exception as e:
+        logger.error(f"Error getting bin positions: {e}")
+        return False
+
+    success = True
+    for piece_id in captured_piece_ids:
+        piece_type = piece_id_to_type.get(piece_id, "unknown")
+        logger.info(f"Handling captured piece: ID {piece_id}, Type: {piece_type}")
+        
+        # Determine target bin based on piece color (simplified logic)
+        # You might need a more robust way to determine piece color from type string
+        if "_w" in piece_type.lower(): # Assumes piece types end with _w or _b
+            target_bin_pos = white_bin_drop_pos
+            target_bin_name = "White Bin"
+        elif "_b" in piece_type.lower():
+            target_bin_pos = black_bin_drop_pos
+            target_bin_name = "Black Bin"
+        else:
+            logger.warning(f"Could not determine color for captured piece {piece_id} ({piece_type}). Placing in White Bin as default.")
+            target_bin_pos = white_bin_drop_pos
+            target_bin_name = "White Bin (Default)"
+
+        # Get current position of the captured piece
+        try:
+            piece_pos, _ = p.getBasePositionAndOrientation(piece_id)
+        except p.error:
+            logger.warning(f"Captured piece ID {piece_id} no longer exists in simulation, skipping.")
+            continue # Piece might have been removed by PyBullet already
+
+        logger.info(f"Moving captured piece {piece_id} ({piece_type}) to {target_bin_name} at {target_bin_pos}")
+
+        # --- CRITICAL: Use the robot's pick_and_place function ---
+        # Move the piece from its current location to the bin drop position
+        # You need to determine the appropriate robot controller.
+        # For now, assume the provided robot_controller is used.
+        # The pick_and_place function needs the piece ID and target position.
+        # It will handle approach, grasp, lift, move, place, open gripper.
+        move_success = robot_controller.pick_and_place_with_retry(
+            object_id=piece_id,
+            start_pos=piece_pos, # Current position of the captured piece
+            target_pos=target_bin_pos, # Drop position above the target bin
+            max_retries=config.task.max_retries # Use config value
+            # You might need to pass additional parameters like move_log_data if required
+        )
+        
+        if not move_success:
+            logger.error(f"Failed to move captured piece {piece_id} to {target_bin_name}.")
+            success = False # Mark overall success as False, but continue with other captured pieces
+        else:
+            logger.info(f"Successfully moved captured piece {piece_id} to {target_bin_name}.")
+
+    return success
+

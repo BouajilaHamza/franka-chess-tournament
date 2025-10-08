@@ -38,7 +38,7 @@
     "num_arm_joints": 7,
     "max_joint_force": 70.0,
     "gripper_force": 70.0,
-    "gripper_open": 0.025,
+    "gripper_open": 0.02,
     "gripper_lateral_friction": 0.7,
     "gripper_spinning_friction": 0.1,
     "gripper_rolling_friction": 0.1,
@@ -84,7 +84,7 @@
     "clearance_z": 0.04,
     "pick_z_offset": 0.015,
     "place_z_offset": 0.015,
-    "ee_down_orientation": [3.141592653589793, 0, 0],
+    "ee_down_orientation": [0, 0, 0],
     "xy_tolerance": 0.03,
     "z_tolerance": 0.005,
     "home_move_timeout": 7.0
