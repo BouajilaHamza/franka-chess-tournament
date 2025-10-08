@@ -224,40 +224,69 @@ class EnvironmentBuilder:
         logger.debug(f"Defined square mapping (considering orientation): {list(self.square_to_world_coords.keys())[:5]}...") # Log first 5 keys
 
 
-    def load_pieces(self):
-        """Load all 32 chess pieces in their initial positions."""
+
+    def load_pieces(self, skip_squares=None):
+        """
+        Load chess pieces in their initial positions, optionally skipping specified squares.
+
+        Args:
+            skip_squares (list, optional): A list of square names (e.g., ['f1', 'g1'])
+                                        to skip loading pieces onto.
+                                        Useful for setting up specific board states
+                                        like enabling castling.
+                                        Defaults to None (loads all pieces).
+
+        Returns:
+            self: Returns the builder instance for chaining.
+        """
         if self.physics_client is None:
             raise RuntimeError("Physics client not connected. Call connect() first.")
         if not self.square_to_world_coords:
-             self._define_square_mapping() # Ensure mapping is defined first
+            self._define_square_mapping()
 
         if not self.pid_to_piece_type:
             self.pid_to_piece_type = {}
+
+
+        if skip_squares is None:
+            skip_squares = []
+        
+        skip_squares_set = set(skip_squares)
+
+
         initial_positions = {
-            'a1': 'rook_w', 'b1': 'knight_w', 'c1': 'bishop_w', 'd1': 'queen_w', 'e1': 'king_w', 'f1': 'bishop_w', 'g1': 'knight_w', 'h1': 'rook_w',
-            'a2': 'pawn_w', 'b2': 'pawn_w', 'c2': 'pawn_w', 'd2': 'pawn_w', 'e2': 'pawn_w', 'f2': 'pawn_w', 'g2': 'pawn_w', 'h2': 'pawn_w',
-            'a7': 'pawn_b', 'b7': 'pawn_b', 'c7': 'pawn_b', 'd7': 'pawn_b', 'e7': 'pawn_b', 'f7': 'pawn_b', 'g7': 'pawn_b', 'h7': 'pawn_b',
-            'a8': 'rook_b', 'b8': 'knight_b', 'c8': 'bishop_b', 'd8': 'queen_b', 'e8': 'king_b', 'f8': 'bishop_b', 'g8': 'knight_b', 'h8': 'rook_b',
+            'a1': 'rook_w', 'b1': 'knight_w', 'c1': 'bishop_w', 'd1': 'queen_w',
+            'e1': 'king_w', 'f1': 'bishop_w', 'g1': 'knight_w', 'h1': 'rook_w',
+            'a2': 'pawn_w', 'b2': 'pawn_w', 'c2': 'pawn_w', 'd2': 'pawn_w',
+            'e2': 'pawn_w', 'f2': 'pawn_w', 'g2': 'pawn_w', 'h2': 'pawn_w',
+            'a7': 'pawn_b', 'b7': 'pawn_b', 'c7': 'pawn_b', 'd7': 'pawn_b',
+            'e7': 'pawn_b', 'f7': 'pawn_b', 'g7': 'pawn_b', 'h7': 'pawn_b',
+            'a8': 'rook_b', 'b8': 'knight_b', 'c8': 'bishop_b', 'd8': 'queen_b',
+            'e8': 'king_b', 'f8': 'bishop_b', 'g8': 'knight_b', 'h8': 'rook_b',
         }
 
         for square, piece_type in initial_positions.items():
+            if square in skip_squares_set:
+                logger.info(f"Skipping loading {piece_type} on square {square} (requested for castling setup or other reason).")
+                continue
+
+
             world_pos = self.square_to_world_coords[square]
-            # Determine URDF path based on piece type
+
             urdf_path = self._get_piece_urdf_path(piece_type)
             if not urdf_path:
                 logger.error(f"URDF path not found for piece type: {piece_type}")
-                continue # Skip this piece
-
-            # Load the piece using the new generic function
+                continue 
+            
             piece_id = self._load_piece_at_position(urdf_path, world_pos)
             if piece_id is not None:
-                self.piece_ids[piece_id] = square # Map piece ID back to square name
+                self.piece_ids[piece_id] = square
                 logger.info(f"Loaded {piece_type} on square {square} at {world_pos} (ID: {piece_id})")
                 self.pid_to_piece_type[piece_id] = piece_type
             else:
                 logger.error(f"Failed to load {piece_type} on square {square} at {world_pos}")
 
-        logger.info("All pieces loaded.")
+        logger.info(f"All pieces loaded (skipped squares: {sorted(skip_squares_set) if skip_squares_set else 'none'}).")
         return self
 
     def _get_piece_urdf_path(self, piece_type):

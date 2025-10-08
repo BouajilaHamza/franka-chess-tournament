@@ -109,6 +109,8 @@ class PickPlaceConfig(BaseModel):
       # Define tolerances - consider making these config parameters
     xy_tolerance: float = Field(default=0.015, gt=0.0, description="1cm tolerance for XY")
     z_tolerance: float = Field(default=0.02, gt=0.0, description="2cm tolerance for Z")
+    
+    home_move_timeout: float = Field(default=5.0, gt=0.0, description="Timeout for moving to home position (seconds)")
 
     # Store Euler angles, convert to quaternion after loading
     ee_down_orientation_euler: List[float] = Field(default=[3.141592653589793, 0, 0], min_items=3, max_items=3, description="EE orientation (Euler angles [roll, pitch, yaw])")
@@ -122,6 +124,7 @@ class PickPlaceConfig(BaseModel):
 
 class TaskConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0, description="Maximum number of retries for pick/place")
+    max_moves: int = Field(default=200, ge=1, description="Maximum number of moves before forcing game end")
     
 
 
